@@ -98,7 +98,7 @@ Nothing in Sartor costs money to run. Concretely:
 | Colour detection | k-means on a canvas, in-browser |
 | Garment segmentation | `Xenova/segformer_b2_clothes` via transformers.js, in-browser |
 | Styling decisions | Hand-written colour theory + menswear rules, no model |
-| Virtual try-on | A free Hugging Face Space — the one part that needs network, queues, and can fail |
+| Virtual try-on | Free Hugging Face Spaces, tried in order — the one part that needs network, queues, and can fail |
 | Product-link import | `r.jina.ai` to read the page, `images.weserv.nl` to fetch the image with CORS |
 
 The ML runtimes are excluded from the service worker precache, so installing the
@@ -109,6 +109,10 @@ feature that needs them.
 
 - Virtual try-on runs on shared free hardware. It queues, and sometimes it is
   simply offline. The outfit collage is the reliable preview; try-on is a bonus.
+  Sartor tries two Spaces: the open one (Miragic) currently refuses requests
+  from India, and the better one (Kolors) refuses anonymous requests with a 403.
+  Adding a free Hugging Face read token under **You** unlocks the latter.
+  Failures name the service and the reason rather than a generic error.
 - Selfie extraction occasionally reads hair or skin as a hat or belt, so
   accessories are left unticked by default for you to opt in.
 - Product-link import depends on two public services and on the site being

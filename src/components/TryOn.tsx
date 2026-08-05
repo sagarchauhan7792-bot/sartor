@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { tryOn } from '../lib/tryon'
+import { tryOn, savedHfToken } from '../lib/tryon'
 import { imageUrl } from '../lib/db'
 import type { Item } from '../lib/taxonomy'
 
@@ -34,16 +34,16 @@ export default function TryOn({ items }: { items: Item[] }) {
     if (!garment) return
     setBusy(true)
     setResult(null)
-    setMessage('Connecting to the free try-on service…')
+    setMessage('Connecting…')
     try {
       const person = personBlobRef.current ?? (await loadDefaultModel())
       const garmentUrl = await imageUrl(garment.cutout_path ?? garment.photo_path)
       if (!garmentUrl) throw new Error('Could not read that garment image.')
       const garmentBlob = await (await fetch(garmentUrl)).blob()
 
-      const out = await tryOn(person, garmentBlob, (s) => {
-        if (s.state === 'queued') setMessage('Waiting in the free queue — this can take a minute…')
-        if (s.state === 'generating') setMessage('Generating…')
+      const out = await tryOn(person, garmentBlob, garment.category, (s) => {
+        if (s.state === 'connecting') setMessage(`Connecting to ${s.provider}…`)
+        if (s.state === 'queued') setMessage(`${s.provider} is working — the free queue can take a minute…`)
       })
       setResult(out)
       setMessage(null)
@@ -88,8 +88,10 @@ export default function TryOn({ items }: { items: Item[] }) {
 
       {!result && !busy && !message && (
         <p className="mt-2 text-xs leading-relaxed text-ink-faint">
-          Renders this piece on a body using a free, shared service. It queues and sometimes
-          fails — the preview above always works regardless.
+          Renders this piece on a body using free, shared services. They queue and sometimes
+          fail — the preview above always works regardless.
+          {!savedHfToken() &&
+            ' The open service currently blocks requests from India, so this needs a free Hugging Face token — add one under You.'}
         </p>
       )}
 

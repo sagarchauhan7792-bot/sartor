@@ -1,70 +1,140 @@
-// Virtual try-on via a free Hugging Face Space.
+// Virtual try-on via free Hugging Face Spaces.
 //
-// This is genuinely best-effort: free Spaces queue, sleep, and sometimes go
-// offline entirely. Every failure mode here is surfaced to the user in plain
-// language rather than retried silently, because a 90-second wait that ends in
-// nothing is worse than being told up front.
+// This is genuinely best-effort: free Spaces queue, sleep, change their APIs,
+// and sometimes go offline entirely. So we try more than one, and every failure
+// mode is reported in plain language rather than retried silently — a
+// ninety-second wait that ends in nothing is worse than being told up front.
 
-const SPACE = 'Kwai-Kolors/Kolors-Virtual-Try-On'
+import type { Category } from './taxonomy'
+
+const TOKEN_KEY = 'sartor.hfToken'
+
+export function savedHfToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY)
+}
+
+export function setHfToken(token: string | null): void {
+  if (token) localStorage.setItem(TOKEN_KEY, token)
+  else localStorage.removeItem(TOKEN_KEY)
+}
+
+/** Which garment slot a Space expects, in its own vocabulary. */
+function garmentType(category: Category): string {
+  if (category === 'bottom') return 'Bottom'
+  if (category === 'layer') return 'Dress/Suit'
+  return 'Top'
+}
+
+interface Provider {
+  space: string
+  label: string
+  endpoint: string
+  /** Kolors blocks anonymous API access; it needs the user's own HF token. */
+  needsToken?: boolean
+  args: (person: Blob, garment: Blob, category: Category) => unknown[]
+}
+
+const PROVIDERS: Provider[] = [
+  {
+    space: 'Miragic-AI/Miragic-Virtual-Try-On',
+    label: 'Miragic',
+    endpoint: '/virtual_tryon',
+    args: (person, garment, category) => [person, garment, garmentType(category)],
+  },
+  {
+    space: 'Kwai-Kolors/Kolors-Virtual-Try-On',
+    label: 'Kolors',
+    endpoint: '/tryon',
+    needsToken: true,
+    args: (person, garment) => [person, garment, 0, true],
+  },
+]
 
 export type TryOnStatus =
-  | { state: 'connecting' }
-  | { state: 'queued'; position?: number }
-  | { state: 'generating' }
+  | { state: 'connecting'; provider: string }
+  | { state: 'queued'; provider: string }
   | { state: 'done'; url: string }
-  | { state: 'failed'; message: string }
-
-/** A stock male model image, used when the user hasn't supplied a body photo. */
-export const DEFAULT_MODEL_IMAGE = 'model/male-model.jpg'
 
 /**
- * Dress `personBlob` in `garmentBlob`. Resolves with an object URL of the
- * result, or throws with a message worth showing.
+ * Dress `person` in `garment`. Tries each available provider in turn and
+ * resolves with an image URL, or throws with a message worth showing.
  */
 export async function tryOn(
-  personBlob: Blob,
-  garmentBlob: Blob,
+  person: Blob,
+  garment: Blob,
+  category: Category,
   onStatus?: (s: TryOnStatus) => void,
 ): Promise<string> {
-  onStatus?.({ state: 'connecting' })
+  const token = savedHfToken()
+  const usable = PROVIDERS.filter((p) => !p.needsToken || token)
 
-  let client: { predict: (endpoint: string, args: unknown[]) => Promise<{ data: unknown[] }> }
-  try {
-    const { Client } = await import('@gradio/client')
-    client = (await Client.connect(SPACE)) as unknown as typeof client
-  } catch {
-    throw new Error(
-      'The free try-on service is unreachable right now. It runs on shared hardware and goes offline periodically — the outfit preview above still works.',
-    )
+  if (usable.length === 0) {
+    throw new Error('No try-on service is available without a Hugging Face token.')
   }
 
-  onStatus?.({ state: 'queued' })
+  const { Client } = await import('@gradio/client')
+  const failures: string[] = []
 
-  let result: { data: unknown[] }
-  try {
-    result = await client.predict('/tryon', [
-      personBlob,
-      garmentBlob,
-      0, // seed
-      true, // randomise seed
-    ])
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    if (/quota|rate|limit/i.test(msg)) {
-      throw new Error('The free try-on service has hit its shared usage limit. Try again in a while.')
+  for (const provider of usable) {
+    try {
+      onStatus?.({ state: 'connecting', provider: provider.label })
+      const client = await Client.connect(
+        provider.space,
+        token ? { hf_token: token as `hf_${string}` } : undefined,
+      )
+
+      onStatus?.({ state: 'queued', provider: provider.label })
+      const result = await client.predict(
+        provider.endpoint,
+        provider.args(person, garment, category),
+      )
+
+      const url = firstImageUrl(result.data as unknown[])
+      if (!url) throw new Error('returned no image')
+      onStatus?.({ state: 'done', url })
+      return url
+    } catch (e) {
+      const raw = errorText(e)
+      console.warn(`[sartor] try-on via ${provider.label} failed:`, raw, e)
+      failures.push(`${provider.label}: ${summarise(raw)}`)
     }
-    if (/timeout|time out/i.test(msg)) {
-      throw new Error('Try-on took too long and timed out — the free queue was busy.')
-    }
-    throw new Error('Try-on failed on the service side. This happens with free Spaces; the outfit preview above is unaffected.')
   }
 
-  onStatus?.({ state: 'generating' })
+  throw new Error(
+    `Try-on didn't work this time. ${failures.join('; ')}. ` +
+      'These are free shared services, so this happens — the outfit preview above is unaffected.',
+  )
+}
 
-  const url = firstImageUrl(result.data)
-  if (!url) throw new Error('The service returned no image.')
-  onStatus?.({ state: 'done', url })
-  return url
+/** Gradio throws plain objects as often as Errors; dig out something readable. */
+function errorText(e: unknown): string {
+  if (e instanceof Error) return e.message
+  if (e && typeof e === 'object') {
+    const o = e as Record<string, unknown>
+    for (const key of ['message', 'original_msg', 'detail', 'title', 'stage']) {
+      const v = o[key]
+      if (typeof v === 'string' && v) return v
+    }
+    try {
+      return JSON.stringify(e)
+    } catch {
+      return String(e)
+    }
+  }
+  return String(e)
+}
+
+function summarise(msg: string): string {
+  if (/403/.test(msg)) return 'needs a Hugging Face token'
+  if (/quota|rate|limit/i.test(msg)) return 'hit its usage limit'
+  if (/timeout|timed out/i.test(msg)) return 'timed out in the queue'
+  if (/region/i.test(msg)) return 'is not available in your region'
+  if (/fetch|network|config/i.test(msg)) return 'was unreachable'
+  // The service often explains itself better than a generic label can —
+  // pass its own words through when they're short enough to read.
+  const clean = msg.replace(/\s+/g, ' ').trim()
+  if (clean.length > 0 && clean.length < 160) return clean
+  return 'failed'
 }
 
 /** Gradio returns files in a few shapes depending on version. */

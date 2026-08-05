@@ -8,6 +8,7 @@ import {
 import { compressPhoto } from '../lib/images'
 import { uploadImage } from '../lib/db'
 import { DEFAULT_OCCASIONS } from '../lib/taxonomy'
+import { savedHfToken, setHfToken } from '../lib/tryon'
 
 const QUIZ: {
   key: keyof QuizAnswers
@@ -60,6 +61,8 @@ export default function Profile() {
   const [skin, setSkin] = useState<{ hex: string; hairHex: string } | null>(null)
   const [selfieMsg, setSelfieMsg] = useState<string | null>(null)
   const [newOccasion, setNewOccasion] = useState('')
+  const [hfToken, setHfTokenInput] = useState(savedHfToken() ?? '')
+  const [tokenSaved, setTokenSaved] = useState(false)
   const selfieRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -256,6 +259,39 @@ export default function Profile() {
             Add
           </button>
         </div>
+      </section>
+
+      {/* ---------- optional try-on token ---------- */}
+      <section className="mt-4 rounded-2xl bg-white p-5 shadow-card">
+        <p className="text-[11px] font-semibold tracking-[0.15em] text-ink-faint uppercase">
+          Try-on quality
+        </p>
+        <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+          The open try-on service currently refuses requests from India, so seeing an outfit on
+          a real body needs a free Hugging Face token. Everything else in Sartor works without it.
+        </p>
+        <div className="mt-3 flex gap-2">
+          <input
+            type="password"
+            value={hfToken}
+            onChange={(e) => setHfTokenInput(e.target.value)}
+            placeholder="hf_… (optional)"
+            className="min-w-0 flex-1 rounded-xl border border-linen bg-white px-3 py-2 text-sm outline-none focus:border-bronze"
+          />
+          <button
+            onClick={() => {
+              setHfToken(hfToken.trim() || null)
+              setTokenSaved(true)
+              setTimeout(() => setTokenSaved(false), 1800)
+            }}
+            className="shrink-0 rounded-xl bg-ink px-4 text-sm font-semibold text-ivory"
+          >
+            {tokenSaved ? '✓' : 'Save'}
+          </button>
+        </div>
+        <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
+          Create one at huggingface.co/settings/tokens with read access. It stays on this device.
+        </p>
       </section>
 
       <button
