@@ -107,6 +107,30 @@ function has(items: Item[], subcategory: string): boolean {
   return items.some((i) => i.subcategory === subcategory)
 }
 
+/**
+ * Current season by month, on the Indian calendar the taxonomy is built around.
+ * October is a genuine shoulder month, so nothing is penalised then.
+ */
+export function currentSeason(d = new Date()): string {
+  const m = d.getMonth() + 1
+  if (m >= 3 && m <= 6) return 'Summer'
+  if (m >= 7 && m <= 9) return 'Monsoon'
+  if (m === 10) return 'All-season'
+  return 'Winter'
+}
+
+/**
+ * How appropriate an item is right now: 1 = in season or year-round,
+ * 0.45 = actively out of season (a wool coat in June).
+ */
+function seasonFactor(item: Item, season: string): number {
+  const tags = item.seasons ?? []
+  if (season === 'All-season') return 1
+  if (tags.length === 0) return 1
+  if (tags.includes('All-season') || tags.includes(season)) return 1
+  return 0.45
+}
+
 /** Style observations that make a good outfit feel intentional. */
 function styleNotes(items: Item[], occasion: string): string[] {
   const notes: string[] = []
@@ -160,6 +184,7 @@ export function scoreOutfit(
   occasion: string,
   profile: ColorProfile | null,
   weights: PrefWeights = EMPTY_WEIGHTS,
+  season: string = currentSeason(),
 ): Outfit {
   const pieces = items
     .map((i) => i.colors?.[0])
@@ -222,17 +247,31 @@ export function scoreOutfit(
   const avgWorn = items.reduce((s, i) => s + (i.times_worn ?? 0), 0) / Math.max(1, items.length)
   if (avgWorn < 2) score += 2
 
+  // --- season ---
+  const seasonFactors = items.map((i) => seasonFactor(i, season))
+  const outOfSeason = items.filter((_, n) => seasonFactors[n] < 1)
+  const avgSeason = seasonFactors.reduce((s, f) => s + f, 0) / Math.max(1, seasonFactors.length)
+  score *= 0.55 + avgSeason * 0.45
+
   // A definite mistake caps the whole look. Averaging can otherwise hide
   // incoherence — formal shoes and joggers average out to "about right".
   const clashCount = activeClashes(items, occasion).length
   if (clashCount > 0) score = Math.min(score, 58 - (clashCount - 1) * 12)
   if (formalitySpread(items) > 2.4) score = Math.min(score, 62)
 
+  const notes = styleNotes(items, occasion)
+  if (outOfSeason.length) {
+    const names = outOfSeason.map((i) => i.name.toLowerCase()).join(' and ')
+    notes.unshift(
+      `You've tagged ${names} for another season — fine if the weather says otherwise.`,
+    )
+  }
+
   return {
     items,
     score: Math.round(Math.max(0, Math.min(100, score))),
     colorReason: harmony.reason,
-    styleNotes: styleNotes(items, occasion),
+    styleNotes: notes,
     occasion,
   }
 }
@@ -249,6 +288,8 @@ export interface GenerateOptions {
   pinned?: Item[]
   /** how many distinct outfits to return */
   count?: number
+  /** defaults to the season we're actually in */
+  season?: string
 }
 
 /**
@@ -259,7 +300,7 @@ export function generateOutfits(all: Item[], opts: GenerateOptions): Outfit[] {
   const {
     occasion, profile, weights = EMPTY_WEIGHTS,
     cleanOnly = true, includeLayer = true, includeAccessory = true,
-    pinned = [], count = 12,
+    pinned = [], count = 12, season = currentSeason(),
   } = opts
 
   const usable = all.filter((i) => (cleanOnly ? i.laundry_status === 'clean' : true))
@@ -279,11 +320,15 @@ export function generateOutfits(all: Item[], opts: GenerateOptions): Outfit[] {
 
   if (tops.length === 0 || bottoms.length === 0) return []
 
-  // Cap the search so a large closet stays instant: prefer items tagged for
-  // this occasion, then the least-worn.
+  // Cap the search so a large closet stays instant. Rank by season first —
+  // otherwise out-of-season pieces can crowd wearable ones out of the pool —
+  // then by occasion tag, then least-worn.
   const rank = (list: Item[], n: number) =>
     [...list]
       .sort((a, b) => {
+        const as = seasonFactor(a, season)
+        const bs = seasonFactor(b, season)
+        if (as !== bs) return bs - as
         const at = a.occasions?.includes(occasion) ? 1 : 0
         const bt = b.occasions?.includes(occasion) ? 1 : 0
         if (at !== bt) return bt - at
@@ -304,15 +349,15 @@ export function generateOutfits(all: Item[], opts: GenerateOptions): Outfit[] {
       for (const shoe of shoeOptions) {
         // base look, then optionally layered / accessorised
         const base = [top, bottom, ...(shoe ? [shoe] : [])]
-        candidates.push(scoreOutfit(base, occasion, profile, weights))
+        candidates.push(scoreOutfit(base, occasion, profile, weights, season))
 
         for (const layer of L.slice(0, 3)) {
-          candidates.push(scoreOutfit([...base, layer], occasion, profile, weights))
+          candidates.push(scoreOutfit([...base, layer], occasion, profile, weights, season))
         }
         for (const acc of A.slice(0, 2)) {
-          candidates.push(scoreOutfit([...base, acc], occasion, profile, weights))
+          candidates.push(scoreOutfit([...base, acc], occasion, profile, weights, season))
           if (L.length) {
-            candidates.push(scoreOutfit([...base, L[0], acc], occasion, profile, weights))
+            candidates.push(scoreOutfit([...base, L[0], acc], occasion, profile, weights, season))
           }
         }
       }
@@ -391,7 +436,7 @@ export function findGaps(
     { name: 'Brown', hex: '#6b4b2f' },
   ]
 
-  const results: { suggestion: string; unlocks: number }[] = []
+  const results: { suggestion: string; unlocks: number; subcategory: string }[] = []
 
   for (const type of candidateTypes) {
     for (const color of candidateColors) {
@@ -427,11 +472,23 @@ export function findGaps(
         results.push({
           suggestion: `${color.name} ${type.subcategory.toLowerCase()}`,
           unlocks: withItem,
+          subcategory: type.subcategory,
         })
       }
     }
   }
 
   void baseline
-  return results.sort((a, b) => b.unlocks - a.unlocks).slice(0, 5)
+
+  // Only the best colour per garment type. Otherwise a bottleneck category
+  // fills the whole list — "buy sneakers" five times in different colours is
+  // not advice anyone can act on.
+  const bestPerType = new Map<string, { suggestion: string; unlocks: number; subcategory: string }>()
+  for (const r of results.sort((a, b) => b.unlocks - a.unlocks)) {
+    if (!bestPerType.has(r.subcategory)) bestPerType.set(r.subcategory, r)
+  }
+  return [...bestPerType.values()]
+    .sort((a, b) => b.unlocks - a.unlocks)
+    .slice(0, 5)
+    .map(({ suggestion, unlocks }) => ({ suggestion, unlocks }))
 }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { listItems } from '../lib/db'
 import {
   listSavedOutfits, deleteSavedOutfit, saveOutfit,
@@ -8,9 +9,11 @@ import { scoreOutfit } from '../lib/outfit'
 import { CATEGORIES, DEFAULT_OCCASIONS, type Category, type Item } from '../lib/taxonomy'
 import OutfitCollage from '../components/OutfitCollage'
 import StorageImg from '../components/StorageImg'
+import WoreButton from '../components/WoreButton'
+import InspoBoard from '../components/InspoBoard'
 
 export default function Lookbook() {
-  const [tab, setTab] = useState<'saved' | 'build'>('saved')
+  const [tab, setTab] = useState<'saved' | 'build' | 'inspo'>('saved')
   const [items, setItems] = useState<Item[]>([])
   const [outfits, setOutfits] = useState<SavedOutfit[]>([])
   const [profile, setProfile] = useState<SartorProfile | null>(null)
@@ -28,11 +31,17 @@ export default function Lookbook() {
 
   return (
     <div className="mx-auto max-w-lg px-4 pt-6">
-      <h1 className="font-display text-4xl font-light italic">Lookbook</h1>
+      <header className="flex items-end justify-between gap-3">
+        <h1 className="font-display text-4xl font-light italic">Lookbook</h1>
+        <Link to="/calendar" className="shrink-0 pb-1.5 text-xs font-medium text-bronze-deep">
+          ▦ Calendar
+        </Link>
+      </header>
 
-      <div className="mt-4 mb-5 flex gap-2">
+      <div className="no-scrollbar -mx-4 mt-4 mb-5 flex gap-2 overflow-x-auto px-4">
         <Tab active={tab === 'saved'} onClick={() => setTab('saved')} label={`Saved (${outfits.length})`} />
         <Tab active={tab === 'build'} onClick={() => setTab('build')} label="Build a look" />
+        <Tab active={tab === 'inspo'} onClick={() => setTab('inspo')} label="Inspiration" />
       </div>
 
       {tab === 'saved' && (
@@ -72,6 +81,7 @@ export default function Lookbook() {
                       Remove
                     </button>
                   </div>
+                  <WoreButton items={its} outfitId={o.id} className="mt-2 w-full" />
                 </div>
               )
             })}
@@ -86,6 +96,8 @@ export default function Lookbook() {
           onSaved={(o) => setOutfits((list) => [o, ...list])}
         />
       )}
+
+      {tab === 'inspo' && <InspoBoard items={items} />}
     </div>
   )
 }

@@ -98,6 +98,9 @@ export async function extractColors(
   source: Blob | string,
   k = 4,
   hasAlpha = false,
+  /** Drop clusters smaller than this share. Lower it when accent colours
+   *  matter — shoes are only a few percent of a full-outfit photo. */
+  minRatio = 0.06,
 ): Promise<ItemColor[]> {
   const img = await loadImage(source)
   const size = 96
@@ -185,7 +188,7 @@ export async function extractColors(
       name: nearestColorName(rgbToHex(c[0], c[1], c[2])),
       ratio: counts[i] / total,
     }))
-    .filter((c) => c.ratio > 0.06)
+    .filter((c) => c.ratio > minRatio)
     .sort((a, b) => b.ratio - a.ratio)
 
   // merge clusters that mapped to the same name

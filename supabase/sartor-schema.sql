@@ -60,6 +60,7 @@ create table if not exists public.sartor_inspo (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   image_path text not null,
+  colors jsonb not null default '[]',
   note text not null default '',
   created_at timestamptz not null default now()
 );
@@ -75,6 +76,30 @@ create table if not exists public.sartor_profile (
   selfie_path text,
   updated_at timestamptz not null default now()
 );
+
+-- ---------- Wear logging ----------
+-- Records a wear and bumps each item's counters in one round trip, so the
+-- log and the per-item totals can never drift apart.
+create or replace function public.sartor_log_wear(
+  p_item_ids uuid[],
+  p_outfit_id uuid default null,
+  p_worn_on date default current_date,
+  p_note text default ''
+) returns void
+language plpgsql
+security invoker
+as $fn$
+begin
+  insert into public.sartor_wear_logs (user_id, worn_on, outfit_id, item_ids, note)
+  values (auth.uid(), p_worn_on, p_outfit_id, p_item_ids, p_note);
+
+  update public.sartor_items
+     set times_worn = times_worn + 1,
+         last_worn  = greatest(coalesce(last_worn, p_worn_on), p_worn_on)
+   where user_id = auth.uid()
+     and id = any(p_item_ids);
+end;
+$fn$;
 
 -- ---------- Row Level Security ----------
 alter table public.sartor_items enable row level security;

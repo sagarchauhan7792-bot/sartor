@@ -3,3 +3,6 @@ dist
 dev-dist
 *.local
 .env
+
+# local test fixtures, never shipped
+public/seed

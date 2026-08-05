@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { deleteItem, getItem, setLaundry } from '../lib/db'
 import type { Item, LaundryStatus } from '../lib/taxonomy'
 import StorageImg from '../components/StorageImg'
+import WoreButton from '../components/WoreButton'
+import { todayISO } from '../lib/wear'
 
 export default function ItemDetail() {
   const { id } = useParams()
@@ -56,6 +58,22 @@ export default function ItemDetail() {
           className={`aspect-square w-full ${item.cutout_path ? 'object-contain p-5' : 'object-cover'}`}
         />
       </div>
+
+      <WoreButton
+        items={[item]}
+        className="mb-2 w-full"
+        onDone={() =>
+          setItem((it) =>
+            it
+              ? {
+                  ...it,
+                  times_worn: (it.times_worn ?? 0) + 1,
+                  last_worn: todayISO(),
+                }
+              : it,
+          )
+        }
+      />
 
       <button
         onClick={cycleLaundry}

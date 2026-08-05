@@ -10,6 +10,9 @@ export default function Closet() {
   const [cat, setCat] = useState<Category | 'all'>('all')
   const [query, setQuery] = useState('')
   const [colorFilter, setColorFilter] = useState<string | null>(null)
+  const [laundryOnly, setLaundryOnly] = useState(false)
+
+  const laundryCount = (items ?? []).filter((i) => i.laundry_status !== 'clean').length
 
   useEffect(() => {
     listItems().then(setItems).catch((e) => setError(e.message))
@@ -29,6 +32,7 @@ export default function Closet() {
 
   const visible = useMemo(() => {
     let list = items ?? []
+    if (laundryOnly) list = list.filter((i) => i.laundry_status !== 'clean')
     if (cat !== 'all') list = list.filter((i) => i.category === cat)
     if (colorFilter) list = list.filter((i) => i.colors?.some((c) => c.name === colorFilter))
     if (query.trim()) {
@@ -42,18 +46,41 @@ export default function Closet() {
       )
     }
     return list
-  }, [items, cat, query, colorFilter])
+  }, [items, cat, query, colorFilter, laundryOnly])
 
   return (
     <div className="mx-auto max-w-lg px-4 pt-6">
-      <header className="mb-5 flex items-end justify-between">
+      <header className="mb-4 flex items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-4xl font-light italic">Closet</h1>
           <p className="mt-1 text-xs text-ink-faint">
-            {items ? `${items.length} pieces` : 'Loading…'}
+            {items ? `${items.length} ${items.length === 1 ? 'piece' : 'pieces'}` : 'Loading…'}
           </p>
         </div>
+        <div className="flex shrink-0 gap-2 pb-1">
+          <Link to="/calendar" className="rounded-full bg-paper px-3 py-1.5 text-xs font-medium text-ink-soft">
+            ▦ Calendar
+          </Link>
+          <Link to="/insights" className="rounded-full bg-paper px-3 py-1.5 text-xs font-medium text-ink-soft">
+            ◷ Insights
+          </Link>
+        </div>
       </header>
+
+      {laundryCount >= 4 && (
+        <Link
+          to="/?"
+          onClick={(e) => { e.preventDefault(); setCat('all'); setLaundryOnly((v) => !v) }}
+          className="mb-3 flex items-center justify-between rounded-2xl bg-clay/10 px-4 py-3"
+        >
+          <span className="text-sm text-clay">
+            🧺 {laundryCount} pieces are in the laundry
+          </span>
+          <span className="text-xs font-medium text-clay">
+            {laundryOnly ? 'show all' : 'view'}
+          </span>
+        </Link>
+      )}
 
       <input
         type="search"

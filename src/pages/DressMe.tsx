@@ -7,6 +7,7 @@ import {
 import { generateOutfits, learnFrom } from '../lib/outfit'
 import { DEFAULT_OCCASIONS, type Item } from '../lib/taxonomy'
 import OutfitCollage from '../components/OutfitCollage'
+import WoreButton from '../components/WoreButton'
 
 type Mode = 'dressme' | 'rate' | 'build'
 
@@ -184,6 +185,10 @@ export default function DressMe() {
                 {saved ? '✓ Saved' : '♡ Save look'}
               </button>
             </div>
+          )}
+
+          {mode !== 'rate' && (
+            <WoreButton items={current.items} className="mt-3 w-full" />
           )}
 
           <p className="mt-3 text-center text-[11px] text-ink-faint">

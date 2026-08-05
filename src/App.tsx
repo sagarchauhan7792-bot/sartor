@@ -8,6 +8,8 @@ import ItemDetail from './pages/ItemDetail'
 import DressMe from './pages/DressMe'
 import Lookbook from './pages/Lookbook'
 import Profile from './pages/Profile'
+import Insights from './pages/Insights'
+import Calendar from './pages/Calendar'
 import NavBar from './components/NavBar'
 
 export default function App() {
@@ -44,6 +46,8 @@ export default function App() {
         <Route path="/item/:id" element={<ItemDetail />} />
         <Route path="/dressme" element={<DressMe />} />
         <Route path="/lookbook" element={<Lookbook />} />
+        <Route path="/calendar" element={<Calendar />} />
+        <Route path="/insights" element={<Insights />} />
         <Route path="/profile" element={<Profile />} />
       </Routes>
       {!hideNav && <NavBar />}
