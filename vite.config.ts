@@ -31,9 +31,10 @@ export default defineConfig({
         // the WASM/onnx assets of background-removal are fetched from CDN at
         // runtime; cache app shell + supabase images for offline viewing
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
-        // onnxruntime assets (used by background removal) are huge; load them
-        // on demand instead of precaching the app shell with 24MB of WASM
-        globIgnores: ['**/ort*', '**/*.wasm'],
+        // The ML runtimes are only needed when the user actually reaches for
+        // background removal or selfie extraction. Keep them out of the install
+        // payload and let them load (and cache) on first use.
+        globIgnores: ['**/ort*', '**/*.wasm', '**/transformers*'],
         runtimeCaching: [
           {
             urlPattern: /supabase\.co\/storage\/.*$/,

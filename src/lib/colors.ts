@@ -42,6 +42,25 @@ export const NAMED_COLORS: { name: string; hex: string }[] = [
   { name: 'Lavender', hex: '#b6a3d1' },
 ]
 
+/**
+ * Product photos are usually worn by a model, so the palette picks up skin and
+ * hair alongside the garment. Drop colours that look like skin *and* are a
+ * minority of the image — a genuinely beige or tan garment dominates its own
+ * photo, so it survives this filter.
+ */
+export function dropModelTones(colors: ItemColor[]): ItemColor[] {
+  const kept = colors.filter((c) => !(isSkinTone(c.hex) && c.ratio < 0.3))
+  return kept.length > 0 ? kept : colors
+}
+
+function isSkinTone(hex: string): boolean {
+  const [r, g, b] = hexToRgb(hex)
+  const [h, s, l] = rgbToHsl(r, g, b)
+  // warm hue band, moderate saturation, mid-to-light — the range human skin
+  // occupies across tones, from very fair to deep brown
+  return h >= 8 && h <= 42 && s >= 0.15 && s <= 0.7 && l >= 0.18 && l <= 0.86
+}
+
 export function hexToRgb(hex: string): [number, number, number] {
   const h = hex.replace('#', '')
   return [

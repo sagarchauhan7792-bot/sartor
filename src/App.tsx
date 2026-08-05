@@ -10,6 +10,8 @@ import Lookbook from './pages/Lookbook'
 import Profile from './pages/Profile'
 import Insights from './pages/Insights'
 import Calendar from './pages/Calendar'
+import FromSelfie from './pages/FromSelfie'
+import FromUrl from './pages/FromUrl'
 import NavBar from './components/NavBar'
 
 export default function App() {
@@ -43,6 +45,8 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Closet />} />
         <Route path="/add" element={<AddItem />} />
+        <Route path="/add/selfie" element={<FromSelfie />} />
+        <Route path="/add/url" element={<FromUrl />} />
         <Route path="/item/:id" element={<ItemDetail />} />
         <Route path="/dressme" element={<DressMe />} />
         <Route path="/lookbook" element={<Lookbook />} />

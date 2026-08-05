@@ -142,6 +142,18 @@ export default function AddItem() {
           >
             🖼 From gallery
           </button>
+          <button
+            onClick={() => navigate('/add/selfie')}
+            className="w-full max-w-xs rounded-2xl border border-linen bg-white py-4 text-sm font-semibold tracking-widest text-ink uppercase shadow-card"
+          >
+            📸 From a photo of me
+          </button>
+          <button
+            onClick={() => navigate('/add/url')}
+            className="w-full max-w-xs rounded-2xl border border-linen bg-white py-4 text-sm font-semibold tracking-widest text-ink uppercase shadow-card"
+          >
+            🔗 From a store link
+          </button>
           <p className="mt-2 max-w-xs text-center text-xs leading-relaxed text-ink-faint">
             Select multiple photos to add in bulk. The background is removed and colours are
             detected automatically — on your device, free.

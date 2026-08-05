@@ -27,7 +27,20 @@ palette (warm/cool, light/deep). From then on, suggestions favour the colours
 that suit you and quietly down-rank the ones that don't.
 
 **Lookbook** — Save outfits you like. Build looks by hand with live harmony
-scoring and critique.
+scoring and critique. Save reference images to the inspiration board and it
+tells you which of your own clothes get closest to the look.
+
+**Calendar & insights** — Log what you wore with one tap, plan outfits for
+future days, and see where your wardrobe stands: colour balance, most and least
+worn, what to let go of, and which single purchase would unlock the most new
+outfits.
+
+**From a photo of you** — Upload a photo of yourself in an outfit and Sartor
+segments it into individual garments, cuts each one out, and adds them to your
+closet separately. The model runs in your browser; the photo is never uploaded.
+
+**From a link** — Paste a product URL and it pulls in the image and name,
+removes the background, and reads the colours (ignoring the model's skin tone).
 
 ## How the styling engine works
 
@@ -75,9 +88,29 @@ The anon key is public by design; row-level security is what protects the data.
 Open the live URL in Chrome or Safari and choose **Add to Home Screen**. It runs
 full-screen like a native app, and your closet stays browsable offline.
 
-## Roadmap
+## What runs where
 
-- Outfit calendar, wear logging and laundry reminders
-- Wardrobe insights: colour balance, most/least worn, gap analysis, declutter
-- Extract garments from selfies; virtual try-on on a model body; import from a
-  store URL
+Nothing in Sartor costs money to run. Concretely:
+
+| Job | How |
+| --- | --- |
+| Background removal | `@imgly/background-removal`, WASM, in-browser |
+| Colour detection | k-means on a canvas, in-browser |
+| Garment segmentation | `Xenova/segformer_b2_clothes` via transformers.js, in-browser |
+| Styling decisions | Hand-written colour theory + menswear rules, no model |
+| Virtual try-on | A free Hugging Face Space — the one part that needs network, queues, and can fail |
+| Product-link import | `r.jina.ai` to read the page, `images.weserv.nl` to fetch the image with CORS |
+
+The ML runtimes are excluded from the service worker precache, so installing the
+app stays light and the heavy assets download only when you first use the
+feature that needs them.
+
+## Known limits
+
+- Virtual try-on runs on shared free hardware. It queues, and sometimes it is
+  simply offline. The outfit collage is the reliable preview; try-on is a bonus.
+- Selfie extraction occasionally reads hair or skin as a hat or belt, so
+  accessories are left unticked by default for you to opt in.
+- Product-link import depends on two public services and on the site being
+  readable; some retailers block it. Saving the image and adding it from your
+  gallery always works.
