@@ -4,11 +4,12 @@ import {
   loadProfile, saveProfile, toColorProfile, weightsOf,
   saveOutfit, recordRating, type SartorProfile,
 } from '../lib/profileDb'
-import { generateOutfits, learnFrom } from '../lib/outfit'
+import { generateOutfits, learnFrom, type Outfit } from '../lib/outfit'
 import { DEFAULT_OCCASIONS, type Item } from '../lib/taxonomy'
 import OutfitCollage from '../components/OutfitCollage'
 import WoreButton from '../components/WoreButton'
 import TryOn from '../components/TryOn'
+import SwipeCard from '../components/SwipeCard'
 
 type Mode = 'dressme' | 'rate' | 'build'
 
@@ -125,44 +126,34 @@ export default function DressMe() {
 
       {current && (
         <div key={index} className="fade-up">
-          <OutfitCollage items={current.items} />
-
-          <div className="mt-4 flex items-center justify-between">
-            <div className="flex flex-wrap gap-1.5">
-              {current.items.map((i) => (
-                <span key={i.id} className="rounded-full bg-paper px-2.5 py-1 text-[11px] text-ink-soft">
-                  {i.name}
-                </span>
-              ))}
-            </div>
-            <ScoreDial score={current.score} />
-          </div>
-
-          <div className="mt-4 rounded-2xl bg-white p-4 shadow-card">
-            <p className="text-[11px] font-semibold tracking-[0.15em] text-ink-faint uppercase">
-              Why this works
-            </p>
-            <p className="mt-1.5 text-sm leading-relaxed text-ink">{current.colorReason}</p>
-            {current.styleNotes.map((n, i) => (
-              <p key={i} className="mt-2 text-sm leading-relaxed text-ink-soft">— {n}</p>
-            ))}
-          </div>
+          {mode === 'rate' ? (
+            <SwipeCard onSwipe={rate}>
+              <OutfitDetails outfit={current} />
+            </SwipeCard>
+          ) : (
+            <OutfitDetails outfit={current} />
+          )}
 
           {mode === 'rate' ? (
-            <div className="mt-5 flex gap-3">
-              <button
-                onClick={() => rate(false)}
-                className="flex-1 rounded-2xl border border-linen bg-white py-4 text-sm font-semibold text-ink-soft shadow-card"
-              >
-                👎 Not for me
-              </button>
-              <button
-                onClick={() => rate(true)}
-                className="flex-1 rounded-2xl bg-ink py-4 text-sm font-semibold text-ivory shadow-float"
-              >
-                👍 Love it
-              </button>
-            </div>
+            <>
+              <p className="mt-4 text-center text-[11px] tracking-wide text-ink-faint">
+                Swipe right if you'd wear it, left if you wouldn't
+              </p>
+              <div className="mt-2 flex gap-3">
+                <button
+                  onClick={() => rate(false)}
+                  className="flex-1 rounded-2xl border border-linen bg-white py-4 text-sm font-semibold text-ink-soft shadow-card"
+                >
+                  👎 Not for me
+                </button>
+                <button
+                  onClick={() => rate(true)}
+                  className="flex-1 rounded-2xl bg-ink py-4 text-sm font-semibold text-ivory shadow-float"
+                >
+                  👍 Love it
+                </button>
+              </div>
+            </>
           ) : (
             <div className="mt-5 flex gap-3">
               <button
@@ -206,6 +197,36 @@ export default function DressMe() {
 
 function Wrap({ children }: { children: React.ReactNode }) {
   return <div className="mx-auto max-w-lg px-4 pt-6">{children}</div>
+}
+
+/** The outfit itself — shared by the swipeable card and the plain view. */
+function OutfitDetails({ outfit }: { outfit: Outfit }) {
+  return (
+    <>
+      <OutfitCollage items={outfit.items} />
+
+      <div className="mt-4 flex items-center justify-between">
+        <div className="flex flex-wrap gap-1.5">
+          {outfit.items.map((i) => (
+            <span key={i.id} className="rounded-full bg-paper px-2.5 py-1 text-[11px] text-ink-soft">
+              {i.name}
+            </span>
+          ))}
+        </div>
+        <ScoreDial score={outfit.score} />
+      </div>
+
+      <div className="mt-4 rounded-2xl bg-white p-4 shadow-card">
+        <p className="text-[11px] font-semibold tracking-[0.15em] text-ink-faint uppercase">
+          Why this works
+        </p>
+        <p className="mt-1.5 text-sm leading-relaxed text-ink">{outfit.colorReason}</p>
+        {outfit.styleNotes.map((n, i) => (
+          <p key={i} className="mt-2 text-sm leading-relaxed text-ink-soft">— {n}</p>
+        ))}
+      </div>
+    </>
+  )
 }
 
 function ModeTab({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {

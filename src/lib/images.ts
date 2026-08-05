@@ -28,9 +28,11 @@ export async function removeBackground(
   const result = await imglyRemove(file, {
     output: { format: 'image/png', quality: 0.9 },
     progress: (key, current, total) => {
-      if (key.startsWith('fetch')) {
-        onProgress?.(`Downloading model ${Math.round((current / total) * 100)}%`)
-      }
+      if (!key.startsWith('fetch')) return
+      const pct = Math.round((current / total) * 100)
+      // Once the assets are in, inference is the slow part — leaving the label
+      // at "Downloading 100%" reads as finished-but-frozen.
+      onProgress?.(pct >= 100 ? 'Cutting out garment…' : `Downloading model ${pct}%`)
     },
   })
   return result

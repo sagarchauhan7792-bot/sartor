@@ -131,7 +131,7 @@ export default function FromUrl() {
         </div>
       )}
 
-      {photo && (
+      {photo && status === null && (
         <div className="mt-5 flex flex-col gap-4">
           <div className="cutout-bg aspect-square overflow-hidden rounded-2xl shadow-card">
             {previewUrl && <img src={previewUrl} alt="" className="h-full w-full object-contain p-4" />}
