@@ -109,12 +109,42 @@ export async function extractColors(
   const { data } = ctx.getImageData(0, 0, size, size)
 
   const pixels: [number, number, number][] = []
-  const margin = hasAlpha ? 0 : Math.floor(size * 0.18) // center-crop raw photos
-  for (let y = margin; y < size - margin; y++) {
-    for (let x = margin; x < size - margin; x++) {
-      const i = (y * size + x) * 4
-      if (data[i + 3] < 128) continue // transparent → background
-      pixels.push([data[i], data[i + 1], data[i + 2]])
+
+  if (hasAlpha) {
+    // Cutout: alpha already tells us exactly what the garment is.
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const i = (y * size + x) * 4
+        if (data[i + 3] < 128) continue
+        pixels.push([data[i], data[i + 1], data[i + 2]])
+      }
+    }
+  } else {
+    // Raw photo: the garment is surrounded by whatever it was shot against —
+    // a bed, a wall, a white sweep. Read the border ring to learn that
+    // background colour, then drop pixels close to it. Without this a light
+    // background can out-vote a dark garment.
+    const bg = borderColor(data, size)
+    const margin = Math.floor(size * 0.1)
+    for (let y = margin; y < size - margin; y++) {
+      for (let x = margin; x < size - margin; x++) {
+        const i = (y * size + x) * 4
+        const px: [number, number, number] = [data[i], data[i + 1], data[i + 2]]
+        if (bg && colorDist(px, bg) < 90) continue
+        pixels.push(px)
+      }
+    }
+    // If almost everything got rejected, the garment probably fills the frame
+    // (or matches its background) — fall back to the plain centre crop.
+    if (pixels.length < size * size * 0.04) {
+      pixels.length = 0
+      const m = Math.floor(size * 0.18)
+      for (let y = m; y < size - m; y++) {
+        for (let x = m; x < size - m; x++) {
+          const i = (y * size + x) * 4
+          pixels.push([data[i], data[i + 1], data[i + 2]])
+        }
+      }
     }
   }
   if (pixels.length === 0) return []
@@ -166,6 +196,48 @@ export async function extractColors(
     else merged.set(c.name, { ...c })
   }
   return [...merged.values()].sort((a, b) => b.ratio - a.ratio)
+}
+
+/**
+ * Median colour of the outermost ring of the image — a good proxy for whatever
+ * the garment was photographed against. Returns null if the border is too
+ * varied to be a plain background (e.g. a busy room), in which case we don't
+ * risk removing garment pixels.
+ */
+function borderColor(
+  data: Uint8ClampedArray,
+  size: number,
+): [number, number, number] | null {
+  const ring: [number, number, number][] = []
+  const band = Math.max(2, Math.floor(size * 0.05))
+  const push = (x: number, y: number) => {
+    const i = (y * size + x) * 4
+    ring.push([data[i], data[i + 1], data[i + 2]])
+  }
+  for (let x = 0; x < size; x++) {
+    for (let b = 0; b < band; b++) {
+      push(x, b)
+      push(x, size - 1 - b)
+    }
+  }
+  for (let y = band; y < size - band; y++) {
+    for (let b = 0; b < band; b++) {
+      push(b, y)
+      push(size - 1 - b, y)
+    }
+  }
+  if (ring.length === 0) return null
+
+  const median = (ch: number) => {
+    const vals = ring.map((p) => p[ch]).sort((a, b) => a - b)
+    return vals[Math.floor(vals.length / 2)]
+  }
+  const med: [number, number, number] = [median(0), median(1), median(2)]
+
+  // How consistent is the border? If most of it sits near the median it's a
+  // plain backdrop worth subtracting.
+  const near = ring.filter((p) => colorDist(p, med) < 90).length
+  return near / ring.length > 0.6 ? med : null
 }
 
 function loadImage(source: Blob | string): Promise<HTMLImageElement> {

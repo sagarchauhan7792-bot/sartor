@@ -68,6 +68,8 @@ create table if not exists public.sartor_profile (
   user_id uuid primary key references auth.users(id) on delete cascade,
   color_season text,
   undertone text,
+  depth text,
+  contrast text,
   custom_occasions text[] not null default '{}',
   pref_weights jsonb not null default '{}',
   selfie_path text,
