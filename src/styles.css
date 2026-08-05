@@ -1,0 +1,55 @@
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/fraunces';
+@import 'tailwindcss';
+
+@theme {
+  /* Sartor design tokens — premium editorial, light only */
+  --color-ivory: #faf7f2;
+  --color-paper: #f3efe7;
+  --color-linen: #e9e3d7;
+  --color-ink: #1c1917;
+  --color-ink-soft: #57534e;
+  --color-ink-faint: #a8a29e;
+  --color-bronze: #a4763b;
+  --color-bronze-deep: #82592a;
+  --color-clay: #b45309;
+  --color-sage: #5f6c5d;
+  --color-danger: #b91c1c;
+
+  --font-display: 'Fraunces Variable', Georgia, serif;
+  --font-sans: 'Inter Variable', system-ui, sans-serif;
+
+  --shadow-card: 0 1px 2px rgb(28 25 23 / 0.05), 0 4px 16px rgb(28 25 23 / 0.06);
+  --shadow-float: 0 4px 12px rgb(28 25 23 / 0.1), 0 12px 32px rgb(28 25 23 / 0.12);
+}
+
+html {
+  background: var(--color-ivory);
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+/* checkerboard behind transparent cutout images */
+.cutout-bg {
+  background-color: #fff;
+  background-image:
+    linear-gradient(45deg, #f5f2ec 25%, transparent 25%, transparent 75%, #f5f2ec 75%),
+    linear-gradient(45deg, #f5f2ec 25%, transparent 25%, transparent 75%, #f5f2ec 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 8px 8px;
+}
+
+/* hide scrollbar on horizontal chip rows */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-up { animation: fade-up 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
