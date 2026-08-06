@@ -34,8 +34,3 @@ jobs:
           path: dist
       - id: deployment
         uses: actions/deploy-pages@v4
-        with:
-          # The Pages queue has sat well past the 10-minute default, and a
-          # timeout cancels the deployment for that SHA permanently — every
-          # retry on the same commit is then refused. Wait longer instead.
-          timeout: 1800000
