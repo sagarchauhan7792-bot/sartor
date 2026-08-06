@@ -63,17 +63,61 @@ export async function uploadImage(blob: Blob, kind: 'photo' | 'cutout'): Promise
   return path
 }
 
+const SIGNED_TTL_SECONDS = 60 * 60 * 24 * 7
+const URL_STORE_KEY = 'sartor.signedUrls'
+
+interface SignedEntry { url: string; expires: number }
+
+/**
+ * Signed URLs are minted by a POST, which no service worker can cache — so
+ * without persisting them the app could never show an image offline, even
+ * though the image bytes themselves are cached. Keeping them on disk until
+ * they expire is what makes offline browsing actually work.
+ */
+function loadUrlStore(): Record<string, SignedEntry> {
+  try {
+    return JSON.parse(localStorage.getItem(URL_STORE_KEY) ?? '{}')
+  } catch {
+    return {}
+  }
+}
+
+function saveUrlStore(store: Record<string, SignedEntry>): void {
+  try {
+    localStorage.setItem(URL_STORE_KEY, JSON.stringify(store))
+  } catch {
+    /* quota exhausted — signed URLs are a cache, not state worth failing over */
+  }
+}
+
 const urlCache = new Map<string, string>()
 
-/** Signed URL for a private storage path (cached per session). */
+/** Signed URL for a private storage path, reused until it expires. */
 export async function imageUrl(path: string | null): Promise<string | null> {
   if (!path) return null
-  const cached = urlCache.get(path)
-  if (cached) return cached
+
+  const inMemory = urlCache.get(path)
+  if (inMemory) return inMemory
+
+  const store = loadUrlStore()
+  const saved = store[path]
+  // renew a little early so a URL never expires mid-session
+  if (saved && saved.expires > Date.now() + 60_000) {
+    urlCache.set(path, saved.url)
+    return saved.url
+  }
+
   const { data, error } = await supabase.storage
     .from(STORAGE_BUCKET)
-    .createSignedUrl(path, 60 * 60 * 24 * 7)
-  if (error || !data) return null
+    .createSignedUrl(path, SIGNED_TTL_SECONDS)
+
+  if (error || !data) {
+    // offline (or the sign call failed) — a stale URL still beats no image
+    return saved?.url ?? null
+  }
+
   urlCache.set(path, data.signedUrl)
+  store[path] = { url: data.signedUrl, expires: Date.now() + SIGNED_TTL_SECONDS * 1000 }
+  saveUrlStore(store)
   return data.signedUrl
 }

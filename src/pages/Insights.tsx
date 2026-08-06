@@ -4,7 +4,7 @@ import { listItems } from '../lib/db'
 import { loadProfile, toColorProfile, type SartorProfile } from '../lib/profileDb'
 import { findGaps, currentSeason } from '../lib/outfit'
 import { isNeutral } from '../lib/harmony'
-import { CATEGORIES, type Item } from '../lib/taxonomy'
+import { CATEGORIES, DEFAULT_OCCASIONS, type Item } from '../lib/taxonomy'
 import StorageImg from '../components/StorageImg'
 
 const DAY = 24 * 60 * 60 * 1000
@@ -13,6 +13,7 @@ export default function Insights() {
   const [items, setItems] = useState<Item[] | null>(null)
   const [profile, setProfile] = useState<SartorProfile | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [gapOccasion, setGapOccasion] = useState<string>('Casual')
 
   useEffect(() => {
     Promise.all([listItems(), loadProfile()])
@@ -63,11 +64,11 @@ export default function Insights() {
   const gaps = useMemo(() => {
     if (!items || items.length < 4) return []
     try {
-      return findGaps(items, toColorProfile(profile), 'Casual')
+      return findGaps(items, toColorProfile(profile), gapOccasion)
     } catch {
       return []
     }
-  }, [items, profile])
+  }, [items, profile, gapOccasion])
 
   if (error) return <Wrap><p className="py-16 text-center text-sm text-danger">{error}</p></Wrap>
   if (!items) return <Wrap><div className="mt-6 h-40 animate-pulse rounded-2xl bg-paper" /></Wrap>
@@ -157,11 +158,28 @@ export default function Insights() {
       </Card>
 
       {/* ---------- gaps ---------- */}
-      {gaps.length > 0 && (
-        <Card title="What's missing">
-          <p className="mb-3 text-sm leading-relaxed text-ink-soft">
-            One purchase, ranked by how many new outfits it would create from what you already own.
+      <Card title="What's missing">
+        <p className="mb-3 text-sm leading-relaxed text-ink-soft">
+          One purchase, ranked by how many new outfits it would create from what you already own.
+        </p>
+        <div className="no-scrollbar -mx-1 mb-3 flex gap-2 overflow-x-auto px-1">
+          {[...DEFAULT_OCCASIONS, ...(profile?.custom_occasions ?? [])].map((o) => (
+            <button
+              key={o}
+              onClick={() => setGapOccasion(o)}
+              className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium transition ${
+                gapOccasion === o ? 'bg-ink text-ivory' : 'bg-paper text-ink-soft'
+              }`}
+            >
+              {o}
+            </button>
+          ))}
+        </div>
+        {gaps.length === 0 ? (
+          <p className="py-2 text-sm text-ink-faint">
+            Nothing obvious missing for {gapOccasion.toLowerCase()} — or too few pieces to tell yet.
           </p>
+        ) : (
           <div className="flex flex-col gap-2">
             {gaps.map((g) => (
               <div key={g.suggestion} className="flex items-center justify-between rounded-xl bg-paper px-3.5 py-2.5">
@@ -172,8 +190,8 @@ export default function Insights() {
               </div>
             ))}
           </div>
-        </Card>
-      )}
+        )}
+      </Card>
 
       {/* ---------- most worn ---------- */}
       {s.mostWorn.length > 0 && (

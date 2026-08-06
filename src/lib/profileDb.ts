@@ -5,6 +5,8 @@ import { EMPTY_WEIGHTS } from './outfit'
 import type { Item } from './taxonomy'
 
 export interface SartorProfile {
+  display_name: string | null
+  avatar_path: string | null
   color_season: ColorProfile['season'] | null
   undertone: ColorProfile['undertone'] | null
   depth: ColorProfile['depth'] | null
@@ -23,6 +25,8 @@ export async function loadProfile(): Promise<SartorProfile | null> {
   if (!data) return null
   const w = data.pref_weights ?? {}
   return {
+    display_name: data.display_name ?? null,
+    avatar_path: data.avatar_path ?? null,
     color_season: data.color_season,
     undertone: data.undertone,
     depth: data.depth ?? null,

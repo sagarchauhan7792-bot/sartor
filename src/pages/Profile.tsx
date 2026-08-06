@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { lock, savedEmail } from '../lib/auth'
-import { loadProfile, saveProfile, toColorProfile, type SartorProfile } from '../lib/profileDb'
+import {
+  loadProfile, saveProfile, toColorProfile, listSavedOutfits, type SartorProfile,
+} from '../lib/profileDb'
+import { listItems } from '../lib/db'
+import ProfileHeader from '../components/ProfileHeader'
 import {
   deriveProfile, sampleSelfie, SEASON_INFO, bestColorsFor,
   type QuizAnswers, type ColorProfile,
@@ -53,6 +57,21 @@ const QUIZ: {
   },
 ]
 
+/** A blank profile, for the first edit before one exists on the server. */
+function emptyProfile(): SartorProfile {
+  return {
+    display_name: null,
+    avatar_path: null,
+    color_season: null,
+    undertone: null,
+    depth: null,
+    contrast: null,
+    custom_occasions: [],
+    pref_weights: { colors: {}, types: {}, harmonies: {} },
+    selfie_path: null,
+  }
+}
+
 export default function Profile() {
   const [profile, setProfile] = useState<SartorProfile | null>(null)
   const [loading, setLoading] = useState(true)
@@ -65,8 +84,19 @@ export default function Profile() {
   const [tokenSaved, setTokenSaved] = useState(false)
   const selfieRef = useRef<HTMLInputElement>(null)
 
+  const [stats, setStats] = useState({ pieces: 0, looks: 0, wears: 0 })
+
   useEffect(() => {
     loadProfile().then((p) => { setProfile(p); setLoading(false) })
+    Promise.all([listItems(), listSavedOutfits()])
+      .then(([items, looks]) =>
+        setStats({
+          pieces: items.length,
+          looks: looks.length,
+          wears: items.reduce((s, i) => s + (i.times_worn ?? 0), 0),
+        }),
+      )
+      .catch(() => {})
   }, [])
 
   const colorProfile = toColorProfile(profile)
@@ -106,7 +136,7 @@ export default function Profile() {
       contrast: derived.contrast,
     })
     setProfile((p) => ({
-      ...(p ?? { custom_occasions: [], pref_weights: { colors: {}, types: {}, harmonies: {} }, selfie_path: null }),
+      ...(p ?? emptyProfile()),
       color_season: derived.season,
       undertone: derived.undertone,
       depth: derived.depth,
@@ -137,8 +167,15 @@ export default function Profile() {
 
   return (
     <div className="mx-auto max-w-lg px-4 pt-6">
-      <h1 className="font-display text-4xl font-light italic">You</h1>
-      <p className="mt-1 text-xs text-ink-faint">{savedEmail()}</p>
+      <ProfileHeader
+        avatarPath={profile?.avatar_path ?? null}
+        displayName={profile?.display_name ?? null}
+        email={savedEmail()}
+        stats={stats}
+        onChange={(patch) =>
+          setProfile((p) => ({ ...(p ?? emptyProfile()), ...patch }) as SartorProfile)
+        }
+      />
 
       {/* ---------- colour profile ---------- */}
       <section className="mt-6 rounded-2xl bg-white p-5 shadow-card">

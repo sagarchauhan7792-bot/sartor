@@ -1,4 +1,7 @@
+import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
+import { loadProfile } from '../lib/profileDb'
+import StorageImg from './StorageImg'
 
 const tabs = [
   { to: '/', label: 'Closet', icon: '▤' },
@@ -9,6 +12,16 @@ const tabs = [
 ]
 
 export default function NavBar() {
+  const [avatar, setAvatar] = useState<string | null>(null)
+
+  useEffect(() => {
+    let live = true
+    loadProfile()
+      .then((p) => { if (live) setAvatar(p?.avatar_path ?? null) })
+      .catch(() => {})
+    return () => { live = false }
+  }, [])
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-linen bg-ivory/95 backdrop-blur pb-[env(safe-area-inset-bottom)]">
       <div className="mx-auto flex max-w-lg items-center justify-around px-2 py-2">
@@ -32,8 +45,22 @@ export default function NavBar() {
                 }`
               }
             >
-              <span className="text-base leading-none">{t.icon}</span>
-              {t.label}
+              {({ isActive }) =>
+                <>
+                  {t.to === '/profile' && avatar ? (
+                    <span
+                      className={`h-4 w-4 overflow-hidden rounded-full border ${
+                        isActive ? 'border-ink' : 'border-linen'
+                      }`}
+                    >
+                      <StorageImg path={avatar} alt="" className="h-full w-full object-cover" />
+                    </span>
+                  ) : (
+                    <span className="text-base leading-none">{t.icon}</span>
+                  )}
+                  {t.label}
+                </>
+              }
             </NavLink>
           ),
         )}

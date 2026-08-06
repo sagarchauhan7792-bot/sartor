@@ -35,21 +35,27 @@ export default defineConfig({
         // background removal or selfie extraction. Keep them out of the install
         // payload and let them load (and cache) on first use.
         globIgnores: ['**/ort*', '**/*.wasm', '**/transformers*'],
+        // NOTE: for cross-origin requests Workbox only applies a RegExp that
+        // matches from the START of the URL. A mid-string pattern silently
+        // never fires, which is how these rules were dead on arrival.
         runtimeCaching: [
           {
-            urlPattern: /supabase\.co\/storage\/.*$/,
+            urlPattern: /^https:\/\/[a-z0-9-]+\.supabase\.co\/storage\/.*/i,
             handler: 'CacheFirst',
             options: {
               cacheName: 'sartor-images',
+              // <img> requests are no-cors, so the response is opaque (status 0)
+              cacheableResponse: { statuses: [0, 200] },
               expiration: { maxEntries: 400, maxAgeSeconds: 60 * 60 * 24 * 90 },
             },
           },
           {
-            urlPattern: /supabase\.co\/rest\/.*$/,
+            urlPattern: /^https:\/\/[a-z0-9-]+\.supabase\.co\/rest\/.*/i,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'sartor-data',
               networkTimeoutSeconds: 4,
+              cacheableResponse: { statuses: [200] },
               expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 30 },
             },
           },
