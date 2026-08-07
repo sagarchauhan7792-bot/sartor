@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { deleteItem, getItem, imageUrl, setLaundry, updateItem } from '../lib/db'
+import { deleteItem, getItem, imageUrl, setLaundry, updateItem, uploadImage } from '../lib/db'
 import { extractColors } from '../lib/colors'
+import { removeBackground, trimTransparent } from '../lib/images'
 import {
   CATEGORIES, SUBCATEGORIES, SEASONS, DEFAULT_OCCASIONS, FABRICS,
   type Category, type Item, type ItemColor, type LaundryStatus,
@@ -22,6 +23,7 @@ export default function ItemDetail() {
   const [saving, setSaving] = useState(false)
   const [pickingColor, setPickingColor] = useState<number | null>(null)
   const [redetecting, setRedetecting] = useState(false)
+  const [recutting, setRecutting] = useState<string | null>(null)
   const [customOccasions, setCustomOccasions] = useState<string[]>([])
 
   useEffect(() => {
@@ -77,6 +79,35 @@ export default function ItemDetail() {
       alert(`Could not save: ${e instanceof Error ? e.message : e}`)
     } finally {
       setSaving(false)
+    }
+  }
+
+  /**
+   * Cut the background out of an item that never got one — those render as a
+   * solid rectangle over the body in outfit previews.
+   */
+  async function recut() {
+    if (!draft) return
+    setRecutting('Loading AI model…')
+    try {
+      const url = await imageUrl(draft.photo_path)
+      if (!url) throw new Error('image unavailable')
+      const photo = await (await fetch(url)).blob()
+      const cut = await trimTransparent(await removeBackground(photo, setRecutting))
+      const cutout_path = await uploadImage(cut, 'cutout')
+      const colors = await extractColors(cut, 4, true)
+      await updateItem(draft.id, {
+        cutout_path,
+        colors,
+        primary_color: colors[0]?.name ?? draft.primary_color,
+      })
+      const next = { ...draft, cutout_path, colors, primary_color: colors[0]?.name ?? '' }
+      setDraft(next)
+      setItem(next)
+    } catch {
+      alert('Could not remove the background from that photo.')
+    } finally {
+      setRecutting(null)
     }
   }
 
@@ -150,13 +181,26 @@ export default function ItemDetail() {
         )}
       </header>
 
-      <div className="cutout-bg mb-4 overflow-hidden rounded-2xl shadow-card">
+      <div className="cutout-bg mb-2 overflow-hidden rounded-2xl shadow-card">
         <StorageImg
           path={view.cutout_path ?? view.photo_path}
           alt={view.name}
           className={`aspect-square w-full ${view.cutout_path ? 'object-contain p-5' : 'object-cover'}`}
         />
       </div>
+
+      {/* Without a cutout this piece shows as a solid rectangle over the body
+          in outfit previews — worth offering the fix wherever it's noticed. */}
+      {!view.cutout_path && (
+        <button
+          onClick={recut}
+          disabled={recutting !== null}
+          className="mb-4 w-full rounded-2xl bg-clay/10 py-3 text-xs font-semibold text-clay disabled:opacity-60"
+        >
+          {recutting ?? '✂ Remove the background from this photo'}
+        </button>
+      )}
+      {view.cutout_path && <div className="mb-2" />}
 
       {!editing && (
         <>

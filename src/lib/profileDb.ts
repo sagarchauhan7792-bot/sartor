@@ -7,6 +7,10 @@ import type { Item } from './taxonomy'
 export interface SartorProfile {
   display_name: string | null
   avatar_path: string | null
+  /** full-length photo used as the base of outfit previews */
+  body_path: string | null
+  /** per-slot garment placement, calibrated to this person's body/photo */
+  fit: unknown
   color_season: ColorProfile['season'] | null
   undertone: ColorProfile['undertone'] | null
   depth: ColorProfile['depth'] | null
@@ -27,6 +31,8 @@ export async function loadProfile(): Promise<SartorProfile | null> {
   return {
     display_name: data.display_name ?? null,
     avatar_path: data.avatar_path ?? null,
+    body_path: data.body_path ?? null,
+    fit: data.fit ?? {},
     color_season: data.color_season,
     undertone: data.undertone,
     depth: data.depth ?? null,

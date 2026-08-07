@@ -7,6 +7,7 @@ import {
 import { generateOutfits, learnFrom, type Outfit } from '../lib/outfit'
 import { DEFAULT_OCCASIONS, type Item } from '../lib/taxonomy'
 import OutfitCollage from '../components/OutfitCollage'
+import { resolveFit, type FitSettings } from '../lib/fit'
 import WoreButton from '../components/WoreButton'
 import TryOn from '../components/TryOn'
 import SwipeCard from '../components/SwipeCard'
@@ -32,6 +33,8 @@ export default function DressMe() {
     () => [...DEFAULT_OCCASIONS, ...(profile?.custom_occasions ?? [])],
     [profile],
   )
+
+  const fit = useMemo(() => resolveFit(profile?.fit), [profile])
 
   const outfits = useMemo(() => {
     if (!items) return []
@@ -128,10 +131,10 @@ export default function DressMe() {
         <div key={index} className="fade-up">
           {mode === 'rate' ? (
             <SwipeCard onSwipe={rate}>
-              <OutfitDetails outfit={current} />
+              <OutfitDetails outfit={current} fit={fit} bodyPath={profile?.body_path ?? null} />
             </SwipeCard>
           ) : (
-            <OutfitDetails outfit={current} />
+            <OutfitDetails outfit={current} fit={fit} bodyPath={profile?.body_path ?? null} />
           )}
 
           {mode === 'rate' ? (
@@ -200,10 +203,16 @@ function Wrap({ children }: { children: React.ReactNode }) {
 }
 
 /** The outfit itself — shared by the swipeable card and the plain view. */
-function OutfitDetails({ outfit }: { outfit: Outfit }) {
+function OutfitDetails({
+  outfit, fit, bodyPath,
+}: {
+  outfit: Outfit
+  fit: FitSettings
+  bodyPath: string | null
+}) {
   return (
     <>
-      <OutfitCollage items={outfit.items} />
+      <OutfitCollage items={outfit.items} fit={fit} bodyPath={bodyPath} />
 
       <div className="mt-4 flex items-center justify-between">
         <div className="flex flex-wrap gap-1.5">

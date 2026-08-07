@@ -1,12 +1,24 @@
 import type { Item } from '../lib/taxonomy'
+import { slotStyle, type FitSettings } from '../lib/fit'
 import StorageImg from './StorageImg'
 
 /**
- * Lays the pieces out the way a stylist arranges a flat-lay: layer and top on
- * the upper body, bottom below, shoes at the feet, accessory to the side — over
- * a faint mannequin silhouette so the proportions read as an outfit.
+ * Lays the pieces out over a body — the wearer's own photo when they've added
+ * one, otherwise a plain silhouette. Placement comes from their saved fit, so
+ * garments sit where their shoulders and waist actually are.
  */
-export default function OutfitCollage({ items }: { items: Item[] }) {
+export default function OutfitCollage({
+  items,
+  fit,
+  bodyPath,
+  ghost,
+}: {
+  items: Item[]
+  fit: FitSettings
+  bodyPath?: string | null
+  /** show every slot faintly, for the fit editor */
+  ghost?: boolean
+}) {
   const slot = (c: Item['category']) => items.find((i) => i.category === c)
   const top = slot('top')
   const bottom = slot('bottom')
@@ -16,52 +28,58 @@ export default function OutfitCollage({ items }: { items: Item[] }) {
 
   return (
     <div className="relative mx-auto aspect-[3/4] w-full overflow-hidden rounded-2xl bg-gradient-to-b from-white to-paper shadow-card">
-      <Silhouette />
+      {bodyPath ? (
+        <StorageImg path={bodyPath} alt="" className="absolute inset-0 h-full w-full object-cover" />
+      ) : (
+        <Silhouette />
+      )}
 
-      {/* Slots line up with the silhouette: torso 15–46%, legs 46–77%,
-          feet below that. */}
-      <div className="absolute inset-x-0 top-[13%] flex h-[34%] items-center justify-center gap-0.5">
-        {layer && <Piece item={layer} className="h-full w-[40%] -rotate-6 opacity-95" />}
-        {top && <Piece item={top} className={layer ? 'h-full w-[46%]' : 'h-full w-[56%]'} />}
-      </div>
+      {/* Layer sits behind the top so the top reads as the main piece. */}
+      {layer && (
+        <Piece item={layer} style={slotStyle(fit.layer)} className="-rotate-6 opacity-95" ghost={ghost} />
+      )}
+      {top && <Piece item={top} style={slotStyle(fit.top)} ghost={ghost} />}
+      {bottom && <Piece item={bottom} style={slotStyle(fit.bottom)} ghost={ghost} />}
+      {shoes && <Piece item={shoes} style={slotStyle(fit.shoes)} ghost={ghost} />}
+      {accessory && <Piece item={accessory} style={slotStyle(fit.accessory)} ghost={ghost} />}
+    </div>
+  )
+}
 
-      <div className="absolute inset-x-0 top-[45%] flex h-[33%] items-center justify-center">
-        {bottom && <Piece item={bottom} className="h-full w-[46%]" />}
-      </div>
-
-      <div className="absolute inset-x-0 bottom-[4%] flex h-[16%] items-center justify-center">
-        {shoes && <Piece item={shoes} className="h-full w-[36%]" />}
-      </div>
-
-      {/* accessory tucked into the corner like a styling detail */}
-      {accessory && (
-        <div className="absolute right-[5%] bottom-[24%] h-[14%] w-[20%]">
-          <Piece item={accessory} className="h-full w-full" />
-        </div>
+function Piece({
+  item, style, className, ghost,
+}: {
+  item: Item
+  style: React.CSSProperties
+  className?: string
+  ghost?: boolean
+}) {
+  const isCutout = Boolean(item.cutout_path)
+  return (
+    <div className="absolute" style={style}>
+      <StorageImg
+        path={item.cutout_path ?? item.photo_path}
+        alt={item.name}
+        // A cutout has real transparency. A raw photo does not, and would sit
+        // on the body as a solid rectangle — multiply blending drops light
+        // backgrounds out, and the dashed frame admits when it can't.
+        className={`h-full w-full object-contain ${
+          isCutout
+            ? 'drop-shadow-[0_6px_12px_rgba(28,25,23,0.14)]'
+            : 'mix-blend-multiply'
+        } ${ghost ? 'opacity-70' : ''} ${className ?? ''}`}
+      />
+      {!isCutout && (
+        <span
+          className="pointer-events-none absolute inset-0 rounded-lg border border-dashed border-clay/50"
+          title="Background not removed — open the item to cut it out"
+        />
       )}
     </div>
   )
 }
 
-function Piece({ item, className }: { item: Item; className?: string }) {
-  const isCutout = Boolean(item.cutout_path)
-  return (
-    <StorageImg
-      path={item.cutout_path ?? item.photo_path}
-      alt={item.name}
-      // A cutout already has transparency. A raw photo does not, and a plain
-      // white rectangle would sit on top of everything — multiply blending
-      // drops light backgrounds out so the garment still reads as worn.
-      className={`object-contain ${
-        isCutout
-          ? 'drop-shadow-[0_6px_12px_rgba(28,25,23,0.14)]'
-          : 'mix-blend-multiply'
-      } ${className ?? ''}`}
-    />
-  )
-}
-
-/** Faint body outline so the pieces read as "worn" rather than floating. */
+/** Faint body outline used until the wearer adds a photo of their own. */
 function Silhouette() {
   return (
     <svg

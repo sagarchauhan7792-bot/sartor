@@ -11,6 +11,7 @@ import OutfitCollage from '../components/OutfitCollage'
 import StorageImg from '../components/StorageImg'
 import WoreButton from '../components/WoreButton'
 import InspoBoard from '../components/InspoBoard'
+import { resolveFit } from '../lib/fit'
 
 export default function Lookbook() {
   const [tab, setTab] = useState<'saved' | 'build' | 'inspo'>('saved')
@@ -28,6 +29,7 @@ export default function Lookbook() {
   }, [])
 
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items])
+  const fit = useMemo(() => resolveFit(profile?.fit), [profile])
 
   return (
     <div className="mx-auto max-w-lg px-4 pt-6">
@@ -61,7 +63,7 @@ export default function Lookbook() {
               if (its.length === 0) return null
               return (
                 <div key={o.id} className="fade-up">
-                  <OutfitCollage items={its} />
+                  <OutfitCollage items={its} fit={fit} bodyPath={profile?.body_path ?? null} />
                   <div className="mt-2 flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{o.name}</p>
@@ -137,7 +139,9 @@ function Builder({
         ))}
       </div>
 
-      {chosen.length > 0 && <OutfitCollage items={chosen} />}
+      {chosen.length > 0 && (
+        <OutfitCollage items={chosen} fit={resolveFit(profile?.fit)} bodyPath={profile?.body_path ?? null} />
+      )}
 
       {scored && (
         <div className="mt-4 rounded-2xl bg-white p-4 shadow-card">

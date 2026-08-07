@@ -7,6 +7,7 @@ import { generateOutfits } from '../lib/outfit'
 import { DEFAULT_OCCASIONS, type Item } from '../lib/taxonomy'
 import StorageImg from '../components/StorageImg'
 import OutfitCollage from '../components/OutfitCollage'
+import { resolveFit } from '../lib/fit'
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
@@ -234,7 +235,11 @@ export default function Calendar() {
           <div className="flex flex-col gap-5">
             {suggestions.slice(0, 3).map((o, n) => (
               <div key={n}>
-                <OutfitCollage items={o.items} />
+                <OutfitCollage
+                  items={o.items}
+                  fit={resolveFit(profile?.fit)}
+                  bodyPath={profile?.body_path ?? null}
+                />
                 <p className="mt-2 text-xs text-ink-soft">
                   {o.items.map((i) => i.name).join(' · ')}
                 </p>

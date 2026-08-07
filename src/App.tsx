@@ -13,6 +13,7 @@ import Calendar from './pages/Calendar'
 import FromSelfie from './pages/FromSelfie'
 import FromUrl from './pages/FromUrl'
 import QuickAdd from './pages/QuickAdd'
+import FitEditor from './pages/FitEditor'
 import NavBar from './components/NavBar'
 
 export default function App() {
@@ -54,6 +55,7 @@ export default function App() {
         <Route path="/lookbook" element={<Lookbook />} />
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/insights" element={<Insights />} />
+        <Route path="/fit" element={<FitEditor />} />
         <Route path="/profile" element={<Profile />} />
       </Routes>
       {!hideNav && <NavBar />}

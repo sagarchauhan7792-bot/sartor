@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { lock, savedEmail } from '../lib/auth'
 import {
   loadProfile, saveProfile, toColorProfile, listSavedOutfits, type SartorProfile,
@@ -62,6 +63,8 @@ function emptyProfile(): SartorProfile {
   return {
     display_name: null,
     avatar_path: null,
+    body_path: null,
+    fit: {},
     color_season: null,
     undertone: null,
     depth: null,
@@ -73,6 +76,7 @@ function emptyProfile(): SartorProfile {
 }
 
 export default function Profile() {
+  const navigate = useNavigate()
   const [profile, setProfile] = useState<SartorProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [quizOpen, setQuizOpen] = useState(false)
@@ -296,6 +300,23 @@ export default function Profile() {
             Add
           </button>
         </div>
+      </section>
+
+      {/* ---------- how outfits are previewed ---------- */}
+      <section className="mt-4 rounded-2xl bg-white p-5 shadow-card">
+        <p className="text-[11px] font-semibold tracking-[0.15em] text-ink-faint uppercase">
+          Outfit previews
+        </p>
+        <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+          Use a full-length photo of yourself instead of the default figure, and line the clothes
+          up so they sit where your shoulders and waist actually are.
+        </p>
+        <button
+          onClick={() => navigate('/fit')}
+          className="mt-3 w-full rounded-xl bg-ink py-3 text-xs font-semibold tracking-widest text-ivory uppercase"
+        >
+          {profile?.body_path ? 'Adjust fit' : 'Set up my photo & fit'}
+        </button>
       </section>
 
       {/* ---------- optional try-on token ---------- */}
