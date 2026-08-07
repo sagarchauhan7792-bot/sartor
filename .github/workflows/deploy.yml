@@ -1,9 +1,12 @@
-name: Deploy to GitHub Pages
+name: Build check
 
-# Deliberately artifact-based rather than pushing the build to a gh-pages
-# branch: the bundled transformers.js contains model names ("mistral", …) that
-# GitHub's secret scanner flags as an API key, so committing build output is
-# rejected by push protection.
+# The app is published to the Revnox site repo (sagarchauhan7792-bot/index)
+# under /dress, and served from https://www.revnoxmedia.com/dress/. GitHub's
+# own Pages deployment API is not used: it repeatedly failed to complete inside
+# the 10-minute ceiling actions/deploy-pages enforces.
+#
+# So this workflow only proves the branch builds. To publish, run:
+#   npm run build   and copy dist/ into the index repo's dress/ folder.
 
 on:
   push:
@@ -12,19 +15,10 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: true
 
 jobs:
-  build-deploy:
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -33,9 +27,3 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-      - id: deployment
-        uses: actions/deploy-pages@v4

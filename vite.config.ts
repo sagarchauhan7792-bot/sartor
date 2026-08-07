@@ -3,9 +3,10 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
-// base: repo name — Sartor deploys to GitHub Pages at /sartor/
+// Lives in a /dress folder of the Revnox site repo, served at
+// https://www.revnoxmedia.com/dress/. Everything derives from this one value.
 export default defineConfig({
-  base: '/sartor/',
+  base: '/dress/',
   plugins: [
     react(),
     tailwindcss(),

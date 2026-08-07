@@ -43,11 +43,22 @@ type Progress = (msg: string) => void
 
 let segmenterPromise: Promise<unknown> | null = null
 
+/**
+ * transformers.js is fetched from a CDN rather than bundled. Two reasons: the
+ * minified bundle contains model architecture names ("mistral", …) that
+ * GitHub's secret scanner mistakes for an API key and refuses to accept in a
+ * repository, and this feature already downloads its model weights over the
+ * network, so nothing offline is lost by fetching the library the same way.
+ */
+const TRANSFORMERS_CDN = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0/+esm'
+
 async function getSegmenter(onProgress?: Progress) {
   if (!segmenterPromise) {
     segmenterPromise = (async () => {
       onProgress?.('Loading the clothing model…')
-      const { pipeline } = await import('@huggingface/transformers')
+      const { pipeline } = (await import(
+        /* @vite-ignore */ TRANSFORMERS_CDN
+      )) as { pipeline: (task: string, model: string, opts?: unknown) => Promise<unknown> }
       return pipeline('image-segmentation', 'Xenova/segformer_b2_clothes', {
         progress_callback: (p: { status?: string; progress?: number }) => {
           if (p.status === 'progress' && typeof p.progress === 'number') {

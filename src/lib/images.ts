@@ -1,6 +1,8 @@
 // Client-side image utilities: downscale/compress before upload, and
 // lazy-loaded in-browser background removal (free, WASM).
 
+const BG_REMOVAL_CDN = 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.8/+esm'
+
 /** Downscale + JPEG-compress a photo for storage (max 1200px edge). */
 export async function compressPhoto(file: Blob, maxEdge = 1200, quality = 0.85): Promise<Blob> {
   const img = await blobToImage(file)
@@ -23,11 +25,16 @@ export async function removeBackground(
   onProgress?: (msg: string) => void,
 ): Promise<Blob> {
   onProgress?.('Loading AI model…')
-  const { removeBackground: imglyRemove } = await import('@imgly/background-removal')
+  // Loaded from a CDN rather than bundled: bundling drags in ~23MB of ONNX
+  // runtime WASM, and the library fetches its segmentation model over the
+  // network regardless, so nothing offline is lost by fetching it the same way.
+  const { removeBackground: imglyRemove } = (await import(
+    /* @vite-ignore */ BG_REMOVAL_CDN
+  )) as { removeBackground: (f: Blob, o?: unknown) => Promise<Blob> }
   onProgress?.('Cutting out garment…')
   const result = await imglyRemove(file, {
     output: { format: 'image/png', quality: 0.9 },
-    progress: (key, current, total) => {
+    progress: (key: string, current: number, total: number) => {
       if (!key.startsWith('fetch')) return
       const pct = Math.round((current / total) * 100)
       // Once the assets are in, inference is the slow part — leaving the label
