@@ -5,6 +5,7 @@
 // downloads once (~25MB) and is cached by the browser afterwards.
 
 import type { Category } from './taxonomy'
+import { getPipeline, type Progress } from './hf'
 
 /** Label → where it belongs in the closet. Labels the model emits that aren't
  *  clothing (skin, hair, background) are simply absent from this map. */
@@ -39,39 +40,15 @@ export interface ExtractedGarment {
   coverage: number
 }
 
-type Progress = (msg: string) => void
-
-let segmenterPromise: Promise<unknown> | null = null
-
-/**
- * transformers.js is fetched from a CDN rather than bundled. Two reasons: the
- * minified bundle contains model architecture names ("mistral", …) that
- * GitHub's secret scanner mistakes for an API key and refuses to accept in a
- * repository, and this feature already downloads its model weights over the
- * network, so nothing offline is lost by fetching the library the same way.
- */
-const TRANSFORMERS_CDN = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0/+esm'
 
 async function getSegmenter(onProgress?: Progress) {
-  if (!segmenterPromise) {
-    segmenterPromise = (async () => {
-      onProgress?.('Loading the clothing model…')
-      const { pipeline } = (await import(
-        /* @vite-ignore */ TRANSFORMERS_CDN
-      )) as { pipeline: (task: string, model: string, opts?: unknown) => Promise<unknown> }
-      return pipeline('image-segmentation', 'Xenova/segformer_b2_clothes', {
-        progress_callback: (p: { status?: string; progress?: number }) => {
-          if (p.status === 'progress' && typeof p.progress === 'number') {
-            onProgress?.(`Downloading model ${Math.round(p.progress)}%`)
-          }
-        },
-      })
-    })().catch((e) => {
-      segmenterPromise = null // let the user retry
-      throw e
-    })
-  }
-  return segmenterPromise
+  onProgress?.('Loading the clothing model…')
+  return getPipeline(
+    'image-segmentation',
+    'Xenova/segformer_b2_clothes',
+    onProgress,
+    'clothing model',
+  )
 }
 
 /**

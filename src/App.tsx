@@ -12,6 +12,7 @@ import Insights from './pages/Insights'
 import Calendar from './pages/Calendar'
 import FromSelfie from './pages/FromSelfie'
 import FromUrl from './pages/FromUrl'
+import QuickAdd from './pages/QuickAdd'
 import NavBar from './components/NavBar'
 
 export default function App() {
@@ -44,7 +45,8 @@ export default function App() {
     <div className="min-h-dvh bg-ivory pb-24">
       <Routes>
         <Route path="/" element={<Closet />} />
-        <Route path="/add" element={<AddItem />} />
+        <Route path="/add" element={<QuickAdd />} />
+        <Route path="/add/manual" element={<AddItem />} />
         <Route path="/add/selfie" element={<FromSelfie />} />
         <Route path="/add/url" element={<FromUrl />} />
         <Route path="/item/:id" element={<ItemDetail />} />
