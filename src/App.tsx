@@ -14,6 +14,7 @@ import FromSelfie from './pages/FromSelfie'
 import FromUrl from './pages/FromUrl'
 import QuickAdd from './pages/QuickAdd'
 import FitEditor from './pages/FitEditor'
+import ShouldIBuy from './pages/ShouldIBuy'
 import NavBar from './components/NavBar'
 
 export default function App() {
@@ -56,6 +57,7 @@ export default function App() {
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/insights" element={<Insights />} />
         <Route path="/fit" element={<FitEditor />} />
+        <Route path="/buy" element={<ShouldIBuy />} />
         <Route path="/profile" element={<Profile />} />
       </Routes>
       {!hideNav && <NavBar />}

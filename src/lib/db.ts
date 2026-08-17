@@ -19,7 +19,20 @@ export async function getItem(id: string): Promise<Item | null> {
   return data as Item
 }
 
-export type NewItem = Omit<Item, 'id' | 'user_id' | 'created_at' | 'times_worn' | 'last_worn'>
+/**
+ * Fields the database fills in itself, plus the ones that are genuinely
+ * optional at creation time — pattern, purchase details and repair state can
+ * all be added later from the item page.
+ */
+export type NewItem = Omit<
+  Item,
+  | 'id' | 'user_id' | 'created_at' | 'times_worn' | 'last_worn'
+  | 'pattern' | 'archived' | 'needs_repair' | 'repair_note'
+  | 'brand' | 'price' | 'purchased_on' | 'purchased_from'
+> &
+  Partial<
+    Pick<Item, 'pattern' | 'brand' | 'price' | 'purchased_on' | 'purchased_from'>
+  >
 
 export async function createItem(item: NewItem): Promise<Item> {
   const { data: userData } = await supabase.auth.getUser()

@@ -4,13 +4,14 @@ import { deleteItem, getItem, imageUrl, setLaundry, updateItem, uploadImage } fr
 import { extractColors } from '../lib/colors'
 import { removeBackground, trimTransparent } from '../lib/images'
 import {
-  CATEGORIES, SUBCATEGORIES, SEASONS, DEFAULT_OCCASIONS, FABRICS,
+  CATEGORIES, SUBCATEGORIES, SEASONS, DEFAULT_OCCASIONS, FABRICS, PATTERNS,
   type Category, type Item, type ItemColor, type LaundryStatus,
 } from '../lib/taxonomy'
 import { loadProfile } from '../lib/profileDb'
 import StorageImg from '../components/StorageImg'
 import WoreButton from '../components/WoreButton'
 import ColorPicker from '../components/ColorPicker'
+import WearWith from '../components/WearWith'
 import { todayISO } from '../lib/wear'
 
 export default function ItemDetail() {
@@ -70,6 +71,14 @@ export default function ItemDetail() {
         seasons: draft.seasons,
         occasions: draft.occasions,
         fabric: draft.fabric,
+        pattern: draft.pattern || 'Plain',
+        archived: draft.archived,
+        needs_repair: draft.needs_repair,
+        repair_note: draft.repair_note ?? '',
+        brand: draft.brand ?? '',
+        price: draft.price,
+        purchased_on: draft.purchased_on,
+        purchased_from: draft.purchased_from ?? '',
       }
       await updateItem(draft.id, patched)
       setItem({ ...draft, ...patched } as Item)
@@ -356,6 +365,78 @@ export default function ItemDetail() {
             />
           </Field>
 
+          <Field label="Pattern">
+            <Pills
+              options={[...PATTERNS]}
+              selected={[draft.pattern || 'Plain']}
+              onPick={(v) => patch({ pattern: v })}
+            />
+          </Field>
+
+          <Field label="Where it came from (optional)">
+            <div className="flex flex-col gap-2">
+              <input
+                value={draft.brand ?? ''}
+                onChange={(e) => patch({ brand: e.target.value })}
+                placeholder="Brand"
+                className="w-full rounded-xl border border-linen bg-white px-4 py-2.5 text-sm outline-none focus:border-bronze"
+              />
+              <div className="flex gap-2">
+                <input
+                  value={draft.purchased_from ?? ''}
+                  onChange={(e) => patch({ purchased_from: e.target.value })}
+                  placeholder="Bought from"
+                  className="min-w-0 flex-1 rounded-xl border border-linen bg-white px-4 py-2.5 text-sm outline-none focus:border-bronze"
+                />
+                <input
+                  value={draft.price ?? ''}
+                  onChange={(e) =>
+                    patch({ price: e.target.value === '' ? null : Number(e.target.value) })
+                  }
+                  placeholder="Price"
+                  inputMode="numeric"
+                  className="w-24 shrink-0 rounded-xl border border-linen bg-white px-3 py-2.5 text-sm outline-none focus:border-bronze"
+                />
+              </div>
+              <input
+                type="date"
+                value={draft.purchased_on ?? ''}
+                onChange={(e) => patch({ purchased_on: e.target.value || null })}
+                className="w-full rounded-xl border border-linen bg-white px-4 py-2.5 text-sm text-ink-soft outline-none focus:border-bronze"
+              />
+            </div>
+          </Field>
+
+          <Field label="Condition">
+            <button
+              onClick={() => patch({ needs_repair: !draft.needs_repair })}
+              className={`w-full rounded-xl py-2.5 text-xs font-semibold ${
+                draft.needs_repair ? 'bg-clay/15 text-clay' : 'bg-paper text-ink-soft'
+              }`}
+            >
+              {draft.needs_repair ? '🧵 Needs a tailor — kept out of outfits' : 'Fine as it is'}
+            </button>
+            {draft.needs_repair && (
+              <input
+                value={draft.repair_note ?? ''}
+                onChange={(e) => patch({ repair_note: e.target.value })}
+                placeholder="What needs doing?"
+                className="mt-2 w-full rounded-xl border border-linen bg-white px-4 py-2.5 text-sm outline-none focus:border-bronze"
+              />
+            )}
+          </Field>
+
+          <Field label="Season storage">
+            <button
+              onClick={() => patch({ archived: !draft.archived })}
+              className={`w-full rounded-xl py-2.5 text-xs font-semibold ${
+                draft.archived ? 'bg-bronze/15 text-bronze-deep' : 'bg-paper text-ink-soft'
+              }`}
+            >
+              {draft.archived ? '📦 Boxed away — not suggested' : 'In active rotation'}
+            </button>
+          </Field>
+
           <div className="mt-1 flex gap-3">
             <button
               onClick={cancelEdit}
@@ -380,6 +461,8 @@ export default function ItemDetail() {
           <InfoCard label="Last worn" value={view.last_worn ?? 'Never'} />
         </section>
       )}
+
+      {!editing && <WearWith item={item} />}
 
       {!editing && (
         <button onClick={remove} className="mb-10 w-full py-2 text-center text-xs font-medium text-danger">

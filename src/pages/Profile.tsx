@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { lock, savedEmail } from '../lib/auth'
+import { changePin, lock, savedEmail } from '../lib/auth'
+import { backupFilename, downloadBlob, exportWardrobe } from '../lib/backup'
 import {
   loadProfile, saveProfile, toColorProfile, listSavedOutfits, type SartorProfile,
 } from '../lib/profileDb'
@@ -89,6 +90,11 @@ export default function Profile() {
   const selfieRef = useRef<HTMLInputElement>(null)
 
   const [stats, setStats] = useState({ pieces: 0, looks: 0, wears: 0 })
+  const [backupMsg, setBackupMsg] = useState<string | null>(null)
+  const [pinOpen, setPinOpen] = useState(false)
+  const [oldPin, setOldPin] = useState('')
+  const [newPin, setNewPin] = useState('')
+  const [pinMsg, setPinMsg] = useState<string | null>(null)
 
   useEffect(() => {
     loadProfile().then((p) => { setProfile(p); setLoading(false) })
@@ -350,6 +356,84 @@ export default function Profile() {
         <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
           Create one at huggingface.co/settings/tokens with read access. It stays on this device.
         </p>
+      </section>
+
+      {/* ---------- security & backup ---------- */}
+      <section className="mt-4 rounded-2xl bg-white p-5 shadow-card">
+        <p className="text-[11px] font-semibold tracking-[0.15em] text-ink-faint uppercase">
+          Your closet is yours
+        </p>
+
+        <button
+          onClick={async () => {
+            setBackupMsg('Preparing…')
+            try {
+              const blob = await exportWardrobe(setBackupMsg)
+              downloadBlob(blob, backupFilename())
+              setBackupMsg('Downloaded')
+            } catch (e) {
+              setBackupMsg(`Failed: ${e instanceof Error ? e.message : e}`)
+            }
+            setTimeout(() => setBackupMsg(null), 2500)
+          }}
+          className="mt-3 w-full rounded-xl border border-linen py-3 text-xs font-semibold tracking-widest text-ink uppercase"
+        >
+          {backupMsg ?? '⬇ Download a backup'}
+        </button>
+        <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
+          Everything — clothes, outfits, wear history and settings — as one file you keep.
+        </p>
+
+        {!pinOpen ? (
+          <button
+            onClick={() => setPinOpen(true)}
+            className="mt-4 text-xs font-medium text-bronze-deep underline"
+          >
+            Change my PIN
+          </button>
+        ) : (
+          <div className="mt-4 flex flex-col gap-2">
+            <input
+              type="password"
+              inputMode="numeric"
+              value={oldPin}
+              onChange={(e) => setOldPin(e.target.value.replace(/\D/g, ''))}
+              placeholder="Current PIN"
+              className="rounded-xl border border-linen px-4 py-2.5 text-center text-sm tracking-[0.3em] outline-none focus:border-bronze"
+            />
+            <input
+              type="password"
+              inputMode="numeric"
+              value={newPin}
+              onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
+              placeholder="New PIN"
+              className="rounded-xl border border-linen px-4 py-2.5 text-center text-sm tracking-[0.3em] outline-none focus:border-bronze"
+            />
+            {pinMsg && <p className="text-xs text-clay">{pinMsg}</p>}
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setPinOpen(false); setPinMsg(null); setOldPin(''); setNewPin('') }}
+                className="flex-1 rounded-xl border border-linen py-2.5 text-xs font-semibold text-ink-soft"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  const err = await changePin(oldPin, newPin)
+                  if (err) { setPinMsg(err); return }
+                  setPinMsg(null)
+                  setPinOpen(false)
+                  setOldPin('')
+                  setNewPin('')
+                  alert('PIN changed.')
+                }}
+                className="flex-1 rounded-xl bg-ink py-2.5 text-xs font-semibold text-ivory"
+              >
+                Change it
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
       <button

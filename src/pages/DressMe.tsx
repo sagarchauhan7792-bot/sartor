@@ -21,6 +21,9 @@ export default function DressMe() {
   const [mode, setMode] = useState<Mode>('dressme')
   const [index, setIndex] = useState(0)
   const [saved, setSaved] = useState(false)
+  const [avoidRecent, setAvoidRecent] = useState(false)
+  const [dressShift, setDressShift] = useState(0)
+  const [compare, setCompare] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -44,8 +47,10 @@ export default function DressMe() {
       weights: weightsOf(profile),
       cleanOnly: true,
       count: 15,
+      avoidRecent,
+      formalityShift: dressShift,
     })
-  }, [items, occasion, profile])
+  }, [items, occasion, profile, avoidRecent, dressShift])
 
   const current = outfits[index] ?? null
 
@@ -98,9 +103,37 @@ export default function DressMe() {
         ))}
       </div>
 
-      <div className="mb-4 flex gap-2">
+      <div className="mb-3 flex gap-2">
         <ModeTab active={mode === 'dressme'} onClick={() => setMode('dressme')} label="Suggest" />
         <ModeTab active={mode === 'rate'} onClick={() => { setMode('rate'); setIndex(0) }} label="Rate looks" />
+      </div>
+
+      {/* dress the same occasion up or down, and skip what you just wore */}
+      <div className="mb-4 flex items-center gap-2">
+        {([
+          { v: -1, label: 'Dressed down' },
+          { v: 0, label: 'As usual' },
+          { v: 1, label: 'Dressed up' },
+        ] as const).map((o) => (
+          <button
+            key={o.v}
+            onClick={() => { setDressShift(o.v); setIndex(0) }}
+            className={`flex-1 rounded-full py-1.5 text-[11px] font-medium transition ${
+              dressShift === o.v ? 'bg-bronze text-white' : 'bg-paper text-ink-soft'
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
+        <button
+          onClick={() => { setAvoidRecent((v) => !v); setIndex(0) }}
+          title="Skip anything worn in the last few days"
+          className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-medium transition ${
+            avoidRecent ? 'bg-ink text-ivory' : 'bg-paper text-ink-soft'
+          }`}
+        >
+          ↻ Fresh
+        </button>
       </div>
 
       {needMore && (
@@ -189,6 +222,22 @@ export default function DressMe() {
             </>
           )}
 
+          {mode !== 'rate' && outfits.length > 1 && (
+            <button
+              onClick={() => setCompare(compare === null ? (index + 1) % outfits.length : null)}
+              className="mt-3 w-full py-2 text-center text-xs font-medium text-ink-soft underline"
+            >
+              {compare === null ? 'Compare with the next look' : 'Hide comparison'}
+            </button>
+          )}
+
+          {compare !== null && outfits[compare] && (
+            <div className="mt-2 grid grid-cols-2 gap-3">
+              <ComparePane label="This one" outfit={current} fit={fit} bodyPath={profile?.body_path ?? null} />
+              <ComparePane label="The next" outfit={outfits[compare]} fit={fit} bodyPath={profile?.body_path ?? null} />
+            </div>
+          )}
+
           <p className="mt-3 text-center text-[11px] text-ink-faint">
             Look {index + 1} of {outfits.length}
           </p>
@@ -235,6 +284,31 @@ function OutfitDetails({
         ))}
       </div>
     </>
+  )
+}
+
+/** One side of a head-to-head, for when two looks are both fine and you're stuck. */
+function ComparePane({
+  label, outfit, fit, bodyPath,
+}: {
+  label: string
+  outfit: Outfit
+  fit: FitSettings
+  bodyPath: string | null
+}) {
+  return (
+    <div>
+      <p className="mb-1 text-[10px] font-semibold tracking-[0.15em] text-ink-faint uppercase">
+        {label}
+      </p>
+      <OutfitCollage items={outfit.items} fit={fit} bodyPath={bodyPath} />
+      <div className="mt-1.5 flex items-baseline justify-between gap-2">
+        <p className="min-w-0 flex-1 truncate text-[11px] text-ink-soft">
+          {outfit.items.map((i) => i.name).join(' · ')}
+        </p>
+        <span className="shrink-0 font-display text-lg leading-none">{outfit.score}</span>
+      </div>
+    </div>
   )
 }
 

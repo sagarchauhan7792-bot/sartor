@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { listItems } from '../lib/db'
 import { CATEGORIES, type Category, type Item } from '../lib/taxonomy'
 import StorageImg from '../components/StorageImg'
+import MorningPrompt from '../components/MorningPrompt'
+import BulkBar from '../components/BulkBar'
 
 export default function Closet() {
   const [items, setItems] = useState<Item[] | null>(null)
@@ -11,8 +13,42 @@ export default function Closet() {
   const [query, setQuery] = useState('')
   const [colorFilter, setColorFilter] = useState<string | null>(null)
   const [laundryOnly, setLaundryOnly] = useState(false)
+  const [showArchived, setShowArchived] = useState(false)
+  const [selecting, setSelecting] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  const archivedCount = (items ?? []).filter((i) => i.archived).length
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  async function refresh() {
+    const fresh = await listItems()
+    setItems(fresh)
+    setSelecting(false)
+    setSelectedIds(new Set())
+  }
 
   const laundryCount = (items ?? []).filter((i) => i.laundry_status !== 'clean').length
+
+  /**
+   * One never-worn piece to nudge toward. Only surfaced once the closet is big
+   * enough that owning something unworn is actually notable.
+   */
+  const neglected = useMemo(() => {
+    const list = items ?? []
+    if (list.length < 6) return null
+    const unworn = list.filter((i) => (i.times_worn ?? 0) === 0 && !i.archived)
+    if (unworn.length === 0) return null
+    // the oldest one — it's had the most chances
+    return unworn.reduce((a, b) => (a.created_at <= b.created_at ? a : b))
+  }, [items])
 
   useEffect(() => {
     listItems().then(setItems).catch((e) => setError(e.message))
@@ -32,6 +68,8 @@ export default function Closet() {
 
   const visible = useMemo(() => {
     let list = items ?? []
+    // archived pieces are boxed away — findable on purpose, not by accident
+    list = list.filter((i) => (showArchived ? i.archived : !i.archived))
     if (laundryOnly) list = list.filter((i) => i.laundry_status !== 'clean')
     if (cat !== 'all') list = list.filter((i) => i.category === cat)
     if (colorFilter) list = list.filter((i) => i.colors?.some((c) => c.name === colorFilter))
@@ -46,7 +84,7 @@ export default function Closet() {
       )
     }
     return list
-  }, [items, cat, query, colorFilter, laundryOnly])
+  }, [items, cat, query, colorFilter, laundryOnly, showArchived])
 
   return (
     <div className="mx-auto max-w-lg px-4 pt-6">
@@ -66,6 +104,29 @@ export default function Closet() {
           </Link>
         </div>
       </header>
+
+      {items && <MorningPrompt items={items} />}
+
+      {neglected && (
+        <Link
+          to={`/item/${neglected.id}`}
+          className="mb-3 flex items-center gap-3 rounded-2xl bg-white p-3 shadow-card"
+        >
+          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-paper">
+            <StorageImg
+              path={neglected.cutout_path ?? neglected.photo_path}
+              alt={neglected.name}
+              className="h-full w-full object-contain p-0.5"
+            />
+          </div>
+          <p className="min-w-0 flex-1 text-sm leading-relaxed text-ink-soft">
+            You haven't worn the{' '}
+            <span className="font-medium text-ink">{neglected.name.toLowerCase()}</span> yet — see
+            what it goes with.
+          </p>
+          <span className="shrink-0 text-ink-faint">›</span>
+        </Link>
+      )}
 
       {laundryCount >= 4 && (
         <Link
@@ -95,7 +156,26 @@ export default function Closet() {
         {CATEGORIES.map((c) => (
           <Chip key={c.id} active={cat === c.id} onClick={() => setCat(c.id)} label={c.label} />
         ))}
+        {archivedCount > 0 && (
+          <Chip
+            active={showArchived}
+            onClick={() => setShowArchived((v) => !v)}
+            label={`📦 Stored (${archivedCount})`}
+          />
+        )}
       </div>
+
+      {(items?.length ?? 0) > 1 && (
+        <button
+          onClick={() => {
+            setSelecting((v) => !v)
+            setSelectedIds(new Set())
+          }}
+          className="mb-3 text-xs font-medium text-ink-soft underline"
+        >
+          {selecting ? 'Done selecting' : 'Select several'}
+        </button>
+      )}
 
       {colorNames.length > 1 && (
         <div className="no-scrollbar -mx-4 mb-4 flex items-center gap-2 overflow-x-auto px-4 py-1">
@@ -130,25 +210,38 @@ export default function Closet() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3">
-        {visible.map((item) => (
-          <Link
-            key={item.id}
-            to={`/item/${item.id}`}
-            className="fade-up overflow-hidden rounded-2xl bg-white shadow-card"
-          >
+      <div className={`grid grid-cols-2 gap-3 ${selecting ? 'pb-32' : ''}`}>
+        {visible.map((item) => {
+          const picked = selectedIds.has(item.id)
+          const card = (
             <div className="relative aspect-square">
               <StorageImg
                 path={item.cutout_path ?? item.photo_path}
                 alt={item.name}
                 className={`h-full w-full object-contain ${item.cutout_path ? 'p-3' : 'object-cover'}`}
               />
+              {selecting && (
+                <span
+                  className={`absolute top-2 left-2 flex h-6 w-6 items-center justify-center rounded-full text-xs ${
+                    picked ? 'bg-ink text-ivory' : 'bg-white/90 text-ink-faint'
+                  }`}
+                >
+                  {picked ? '✓' : ''}
+                </span>
+              )}
+              {item.needs_repair && (
+                <span className="absolute bottom-2 left-2 rounded-full bg-clay/90 px-2 py-0.5 text-[10px] font-medium text-white">
+                  🧵 Repair
+                </span>
+              )}
               {item.laundry_status !== 'clean' && (
                 <span className="absolute top-2 right-2 rounded-full bg-ink/80 px-2 py-0.5 text-[10px] font-medium text-ivory">
                   {item.laundry_status === 'dirty' ? 'Laundry' : 'Washing'}
                 </span>
               )}
             </div>
+          )
+          const label = (
             <div className="flex items-center justify-between gap-2 px-3 pt-1 pb-2.5">
               <div className="min-w-0">
                 <p className="truncate text-[13px] font-medium">{item.name}</p>
@@ -164,9 +257,33 @@ export default function Closet() {
                 ))}
               </div>
             </div>
-          </Link>
-        ))}
+          )
+          const shell = `fade-up overflow-hidden rounded-2xl bg-white text-left shadow-card transition ${
+            selecting && picked ? 'ring-2 ring-ink' : ''
+          }`
+
+          // In selection mode a tap picks the item rather than opening it.
+          return selecting ? (
+            <button key={item.id} type="button" onClick={() => toggleSelected(item.id)} className={shell}>
+              {card}
+              {label}
+            </button>
+          ) : (
+            <Link key={item.id} to={`/item/${item.id}`} className={shell}>
+              {card}
+              {label}
+            </Link>
+          )
+        })}
       </div>
+
+      {selecting && selectedIds.size > 0 && items && (
+        <BulkBar
+          selected={items.filter((i) => selectedIds.has(i.id))}
+          onDone={refresh}
+          onCancel={() => { setSelecting(false); setSelectedIds(new Set()) }}
+        />
+      )}
     </div>
   )
 }

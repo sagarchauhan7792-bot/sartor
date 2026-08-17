@@ -5,6 +5,9 @@
 import type { Category, Item } from './taxonomy'
 import { outfitHarmony, isNeutral } from './harmony'
 import { flatterFactor, type ColorProfile } from './season'
+import {
+  fabricFit, patternVerdict, proportionVerdict, metalVerdict, recencyVerdict,
+} from './rules'
 
 export interface Outfit {
   items: Item[]
@@ -179,13 +182,22 @@ function formalitySpread(items: Item[]): number {
 }
 
 /** Score one candidate outfit. */
+export interface ScoreOptions {
+  season?: string
+  /** nudge away from pieces worn in the last few days */
+  avoidRecent?: boolean
+  /** shift the target dressiness up or down, roughly -1..+1 */
+  formalityShift?: number
+}
+
 export function scoreOutfit(
   items: Item[],
   occasion: string,
   profile: ColorProfile | null,
   weights: PrefWeights = EMPTY_WEIGHTS,
-  season: string = currentSeason(),
+  opts: ScoreOptions = {},
 ): Outfit {
+  const season = opts.season ?? currentSeason()
   const pieces = items
     .map((i) => i.colors?.[0])
     .filter(Boolean)
@@ -201,7 +213,9 @@ export function scoreOutfit(
   if (target) {
     const core = items.filter((i) => i.category !== 'accessory')
     const avgFormality = core.reduce((s, i) => s + formality(i), 0) / Math.max(1, core.length)
-    const miss = Math.max(0, Math.abs(avgFormality - target.target) - target.tolerance)
+    // the dial lets you ask for the same occasion dressed up or down
+    const wanted = target.target + (opts.formalityShift ?? 0)
+    const miss = Math.max(0, Math.abs(avgFormality - wanted) - target.tolerance)
     occasionFit = 100 - miss * 42
   }
   const tagged = items.filter((i) => i.occasions?.includes(occasion)).length
@@ -253,6 +267,16 @@ export function scoreOutfit(
   const avgSeason = seasonFactors.reduce((s, f) => s + f, 0) / Math.max(1, seasonFactors.length)
   score *= 0.55 + avgSeason * 0.45
 
+  // --- fabric, pattern, proportion, metals, recency ---
+  const fabric = fabricFit(items, season)
+  score *= 0.85 + Math.min(1.15, fabric.factor) * 0.15
+
+  const pattern = patternVerdict(items)
+  const proportion = proportionVerdict(items)
+  const metals = metalVerdict(items)
+  const recency = opts.avoidRecent ? recencyVerdict(items) : { penalty: 0, note: null }
+  score -= pattern.penalty + proportion.penalty + metals.penalty + recency.penalty
+
   // A definite mistake caps the whole look. Averaging can otherwise hide
   // incoherence — formal shoes and joggers average out to "about right".
   const clashCount = activeClashes(items, occasion).length
@@ -260,6 +284,11 @@ export function scoreOutfit(
   if (formalitySpread(items) > 2.4) score = Math.min(score, 62)
 
   const notes = styleNotes(items, occasion)
+  // Problems first, then observations — the useful sentence should be the one
+  // you read, not the fourth one down.
+  for (const extra of [pattern.note, metals.note, fabric.note, proportion.note, recency.note]) {
+    if (extra) notes.push(extra)
+  }
   if (outOfSeason.length) {
     const names = outOfSeason.map((i) => i.name.toLowerCase()).join(' and ')
     notes.unshift(
@@ -290,6 +319,10 @@ export interface GenerateOptions {
   count?: number
   /** defaults to the season we're actually in */
   season?: string
+  /** nudge away from pieces worn in the last few days */
+  avoidRecent?: boolean
+  /** dress the occasion up (+) or down (−) */
+  formalityShift?: number
 }
 
 /**
@@ -301,9 +334,18 @@ export function generateOutfits(all: Item[], opts: GenerateOptions): Outfit[] {
     occasion, profile, weights = EMPTY_WEIGHTS,
     cleanOnly = true, includeLayer = true, includeAccessory = true,
     pinned = [], count = 12, season = currentSeason(),
+    avoidRecent = false, formalityShift = 0,
   } = opts
+  const score: ScoreOptions = { season, avoidRecent, formalityShift }
 
-  const usable = all.filter((i) => (cleanOnly ? i.laundry_status === 'clean' : true))
+  // Archived pieces are boxed away for the season; a piece awaiting a tailor
+  // can't be worn either.
+  const usable = all.filter(
+    (i) =>
+      !i.archived &&
+      !i.needs_repair &&
+      (cleanOnly ? i.laundry_status === 'clean' : true),
+  )
   const pinnedIds = new Set(pinned.map((p) => p.id))
 
   const pick = (cat: Category) => {
@@ -349,15 +391,15 @@ export function generateOutfits(all: Item[], opts: GenerateOptions): Outfit[] {
       for (const shoe of shoeOptions) {
         // base look, then optionally layered / accessorised
         const base = [top, bottom, ...(shoe ? [shoe] : [])]
-        candidates.push(scoreOutfit(base, occasion, profile, weights, season))
+        candidates.push(scoreOutfit(base, occasion, profile, weights, score))
 
         for (const layer of L.slice(0, 3)) {
-          candidates.push(scoreOutfit([...base, layer], occasion, profile, weights, season))
+          candidates.push(scoreOutfit([...base, layer], occasion, profile, weights, score))
         }
         for (const acc of A.slice(0, 2)) {
-          candidates.push(scoreOutfit([...base, acc], occasion, profile, weights, season))
+          candidates.push(scoreOutfit([...base, acc], occasion, profile, weights, score))
           if (L.length) {
-            candidates.push(scoreOutfit([...base, L[0], acc], occasion, profile, weights, season))
+            candidates.push(scoreOutfit([...base, L[0], acc], occasion, profile, weights, score))
           }
         }
       }
@@ -381,6 +423,30 @@ export function generateOutfits(all: Item[], opts: GenerateOptions): Outfit[] {
     if (results.length >= count) break
   }
   return results
+}
+
+/**
+ * Learn from what was actually worn, rather than only from explicit ratings.
+ * What you reach for is a stronger signal than what you say you like — but a
+ * quieter one, so each wear nudges less than a deliberate swipe.
+ */
+export function learnFromWear(
+  weights: PrefWeights,
+  items: Item[],
+  strength = 0.05,
+): PrefWeights {
+  const next: PrefWeights = {
+    colors: { ...weights.colors },
+    types: { ...weights.types },
+    harmonies: { ...weights.harmonies },
+  }
+  const clamp = (v: number) => Math.max(-1, Math.min(1, v))
+  for (const item of items) {
+    const c = item.colors?.[0]?.name
+    if (c) next.colors[c] = clamp((next.colors[c] ?? 0) + strength)
+    next.types[item.subcategory] = clamp((next.types[item.subcategory] ?? 0) + strength)
+  }
+  return next
 }
 
 /** Update learned weights from a 👍/👎 on an outfit. */
@@ -456,6 +522,7 @@ export function findGaps(
         seasons: ['All-season'],
         occasions: [occasion],
         fabric: 'Cotton',
+        pattern: 'Plain',
         laundry_status: 'clean',
         photo_path: '',
         cutout_path: null,
@@ -463,6 +530,13 @@ export function findGaps(
         times_worn: 0,
         last_worn: null,
         created_at: '',
+        archived: false,
+        needs_repair: false,
+        repair_note: '',
+        brand: '',
+        price: null,
+        purchased_on: null,
+        purchased_from: '',
       }
       const withItem = generateOutfits([...all, phantom], {
         occasion, profile, cleanOnly: false, count: 60,

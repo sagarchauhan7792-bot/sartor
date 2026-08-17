@@ -94,6 +94,13 @@ export default function Insights() {
   return (
     <Wrap>
       <Header />
+      <Link
+        to="/buy"
+        className="mb-4 flex items-center justify-between rounded-2xl bg-ink px-4 py-3.5 text-ivory shadow-float"
+      >
+        <span className="text-sm font-semibold">Thinking of buying something?</span>
+        <span className="text-xs opacity-80">Check it ›</span>
+      </Link>
       <p className="mb-5 text-xs text-ink-faint">
         {items.length} pieces · {s.totalWears} wears logged · {currentSeason().toLowerCase()} right now
       </p>

@@ -28,6 +28,10 @@ export const FABRICS = [
 
 export type LaundryStatus = 'clean' | 'dirty' | 'washing'
 
+/** Surface pattern — two busy pieces together is a mistake colour alone can't catch. */
+export const PATTERNS = ['Plain', 'Striped', 'Checked', 'Printed', 'Textured'] as const
+export type Pattern = (typeof PATTERNS)[number]
+
 export interface ItemColor {
   hex: string
   name: string
@@ -45,6 +49,7 @@ export interface Item {
   seasons: string[]
   occasions: string[]
   fabric: string
+  pattern: string
   laundry_status: LaundryStatus
   photo_path: string
   cutout_path: string | null
@@ -52,4 +57,12 @@ export interface Item {
   times_worn: number
   last_worn: string | null
   created_at: string
+  /** boxed away for the season — out of suggestions until brought back */
+  archived: boolean
+  needs_repair: boolean
+  repair_note: string
+  brand: string
+  price: number | null
+  purchased_on: string | null
+  purchased_from: string
 }

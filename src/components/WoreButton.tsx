@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { logWear } from '../lib/wear'
+import { loadProfile, saveProfile, weightsOf } from '../lib/profileDb'
+import { learnFromWear } from '../lib/outfit'
 import type { Item } from '../lib/taxonomy'
 
 /**
@@ -28,6 +30,12 @@ export default function WoreButton({
       await logWear(items, { outfitId })
       setState('done')
       onDone?.()
+      // Wearing something is a preference signal in its own right, and a more
+      // honest one than a swipe — but it should never block the log itself.
+      try {
+        const profile = await loadProfile()
+        await saveProfile({ pref_weights: learnFromWear(weightsOf(profile), items) })
+      } catch { /* the wear is recorded; the nudge is a bonus */ }
     } catch {
       setState('error')
     }
